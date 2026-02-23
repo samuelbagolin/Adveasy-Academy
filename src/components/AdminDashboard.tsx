@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebase';
-import { ref, onValue, set } from 'firebase/database';
+import { db, firebaseConfig } from '../firebase';
+import { ref, onValue, set, remove, update } from 'firebase/database';
+import { initializeApp, getApps } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { 
   Users, 
   BookOpen, 
@@ -11,7 +13,10 @@ import {
   ChevronRight,
   MoreVertical,
   Mail,
-  Calendar
+  Calendar,
+  Trash2,
+  Edit2,
+  Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { courseData } from '../courseData';
@@ -31,9 +36,14 @@ interface AdminDashboardProps {
 export default function AdminDashboard({ onBack, course }: AdminDashboardProps) {
   const [users, setUsers] = useState<UserStats[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddUser, setShowAddUser] = useState(false);
+  const [showEditUser, setShowEditUser] = useState<UserStats | null>(null);
   const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
   const totalLessons = course.modules.reduce((acc: number, mod: any) => acc + mod.lessons.length, 0);
 
@@ -62,11 +72,71 @@ export default function AdminDashboard({ onBack, course }: AdminDashboardProps) 
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, you'd use Firebase Admin SDK or a cloud function to create users.
-    // Here we'll just simulate adding to a whitelist or just showing a message.
-    alert('Funcionalidade de criação de usuário requer Firebase Admin SDK. Por enquanto, usuários podem se cadastrar na tela de login.');
-    setShowAddUser(false);
-    setNewEmail('');
+    if (!newEmail || !newPassword) return;
+    
+    setActionLoading(true);
+    try {
+      // Create a secondary firebase app to create user without logging out admin
+      const secondaryApp = getApps().find(app => app.name === 'secondary') 
+        || initializeApp(firebaseConfig, 'secondary');
+      const secondaryAuth = getAuth(secondaryApp);
+      
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newEmail, newPassword);
+      const newUser = userCredential.user;
+      
+      // Save user profile to database
+      await set(ref(db, `users/${newUser.uid}`), {
+        email: newEmail,
+        role: 'student',
+        createdAt: Date.now(),
+        lastLogin: Date.now()
+      });
+      
+      // Sign out from secondary app
+      await signOut(secondaryAuth);
+      
+      setShowAddUser(false);
+      setNewEmail('');
+      setNewPassword('');
+      alert('Usuário criado com sucesso no Firebase!');
+    } catch (err: any) {
+      console.error(err);
+      alert('Erro ao criar usuário: ' + err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleEditUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!showEditUser || !editEmail) return;
+
+    setActionLoading(true);
+    try {
+      await update(ref(db, `users/${showEditUser.uid}`), {
+        email: editEmail
+      });
+      setShowEditUser(null);
+      alert('E-mail atualizado no banco de dados!');
+    } catch (err: any) {
+      alert('Erro ao atualizar: ' + err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('Tem certeza que deseja excluir este usuário? Ele perderá o acesso ao curso.')) return;
+
+    setActionLoading(true);
+    try {
+      await remove(ref(db, `users/${userId}`));
+      alert('Usuário removido do banco de dados!');
+    } catch (err: any) {
+      alert('Erro ao excluir: ' + err.message);
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   return (
@@ -202,9 +272,53 @@ export default function AdminDashboard({ onBack, course }: AdminDashboardProps) 
                           {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Nunca'}
                         </td>
                         <td className="px-6 py-4">
-                          <button className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 transition-colors">
-                            <MoreVertical size={18} />
-                          </button>
+                          <div className="relative">
+                            <button 
+                              onClick={() => setActiveMenu(activeMenu === user.uid ? null : user.uid)}
+                              className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 transition-colors"
+                            >
+                              <MoreVertical size={18} />
+                            </button>
+
+                            <AnimatePresence>
+                              {activeMenu === user.uid && (
+                                <>
+                                  <div 
+                                    className="fixed inset-0 z-10" 
+                                    onClick={() => setActiveMenu(null)}
+                                  />
+                                  <motion.div
+                                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                    className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-20 overflow-hidden"
+                                  >
+                                    <button
+                                      onClick={() => {
+                                        setShowEditUser(user);
+                                        setEditEmail(user.email);
+                                        setActiveMenu(null);
+                                      }}
+                                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-200 hover:bg-slate-700 transition-colors"
+                                    >
+                                      <Edit2 size={16} className="text-primary-400" />
+                                      Editar E-mail
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        handleDeleteUser(user.uid);
+                                        setActiveMenu(null);
+                                      }}
+                                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-red-900/20 transition-colors"
+                                    >
+                                      <Trash2 size={16} />
+                                      Excluir Usuário
+                                    </button>
+                                  </motion.div>
+                                </>
+                              )}
+                            </AnimatePresence>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -245,19 +359,95 @@ export default function AdminDashboard({ onBack, course }: AdminDashboardProps) 
                     />
                   </div>
                 </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-slate-400">Senha Inicial</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                    <input 
+                      type="password" 
+                      required
+                      minLength={6}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-primary-500"
+                      placeholder="Mínimo 6 caracteres"
+                    />
+                  </div>
+                </div>
                 <div className="flex gap-3 pt-4">
                   <button 
                     type="button"
+                    disabled={actionLoading}
                     onClick={() => setShowAddUser(false)}
-                    className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-colors"
+                    className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-colors disabled:opacity-50"
                   >
                     Cancelar
                   </button>
                   <button 
                     type="submit"
-                    className="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold transition-colors"
+                    disabled={actionLoading}
+                    className="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                   >
-                    Convidar
+                    {actionLoading ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      'Convidar'
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit User Modal */}
+      <AnimatePresence>
+        {showEditUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-slate-900 border border-slate-800 rounded-2xl p-8 max-w-md w-full shadow-2xl"
+            >
+              <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                <Edit2 className="text-primary-500" />
+                Editar Aluno
+              </h3>
+              <form onSubmit={handleEditUser} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm text-slate-400">E-mail do Aluno</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                    <input 
+                      type="email" 
+                      required
+                      value={editEmail}
+                      onChange={(e) => setEditEmail(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-primary-500"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <button 
+                    type="button"
+                    disabled={actionLoading}
+                    onClick={() => setShowEditUser(null)}
+                    className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-colors disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit"
+                    disabled={actionLoading}
+                    className="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {actionLoading ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      'Salvar'
+                    )}
                   </button>
                 </div>
               </form>

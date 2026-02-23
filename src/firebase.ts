@@ -3,7 +3,7 @@ import { getAuth } from "firebase/auth";
 import { getDatabase } from "firebase/database";
 import { getFirestore } from "firebase/firestore";
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyBJieZhszVNBByPbLKdPQju5jfP_YJmlgs",
   authDomain: "curso-adveasy.firebaseapp.com",
   databaseURL: "https://curso-adveasy-default-rtdb.firebaseio.com",

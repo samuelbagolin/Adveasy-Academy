@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { courseData } from './courseData';
@@ -61,24 +62,36 @@ export default function App() {
     });
 
     const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
       setAuthLoading(false);
       
       if (u) {
-        // Update last login
-        update(ref(db, `users/${u.uid}`), {
-          email: u.email,
-          lastLogin: Date.now()
-        });
-
-        // Load progress
-        const progressRef = ref(db, `users/${u.uid}/progress`);
-        onValue(progressRef, (snapshot) => {
+        const isAdmin = u.email === 'contato@adveasy.com.br';
+        const userRef = ref(db, `users/${u.uid}`);
+        
+        onValue(userRef, (snapshot) => {
           const data = snapshot.val();
-          if (data && data.completedLessons) {
-            setCompletedLessons(data.completedLessons);
+          
+          // If user doesn't exist in DB and is not admin, they were deleted
+          if (!data && !isAdmin) {
+            signOut(auth);
+            setUser(null);
+            return;
           }
-        });
+
+          setUser(u);
+          
+          // Update last login
+          update(userRef, {
+            email: u.email,
+            lastLogin: Date.now()
+          });
+
+          if (data && data.progress && data.progress.completedLessons) {
+            setCompletedLessons(data.progress.completedLessons);
+          }
+        }, { onlyOnce: true });
+      } else {
+        setUser(null);
       }
     });
     return () => unsubscribe();
@@ -405,6 +418,7 @@ export default function App() {
                 </div>
               ) : (
                 <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
                   components={{
                     h1: () => null, // Already rendered above
                     h2: ({ children }) => <h2 className="text-2xl font-bold text-slate-100 mt-12 mb-6">{children}</h2>,
@@ -418,6 +432,14 @@ export default function App() {
                       </li>
                     ),
                     strong: ({ children }) => <strong className="font-bold text-white">{children}</strong>,
+                    table: ({ children }) => (
+                      <div className="overflow-x-auto my-8 border border-slate-800 rounded-xl">
+                        <table className="w-full text-left border-collapse">{children}</table>
+                      </div>
+                    ),
+                    thead: ({ children }) => <thead className="bg-slate-800/50 text-slate-200">{children}</thead>,
+                    th: ({ children }) => <th className="p-4 font-bold border-b border-slate-800">{children}</th>,
+                    td: ({ children }) => <td className="p-4 text-slate-400 border-b border-slate-800">{children}</td>,
                   }}
                 >
                   {currentLesson.content}
