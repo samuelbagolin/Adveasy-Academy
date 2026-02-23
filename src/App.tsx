@@ -113,9 +113,15 @@ export default function App() {
     return course.modules.reduce((acc, mod) => acc + mod.lessons.length, 0);
   }, [course]);
 
+  const validCompletedLessons = useMemo(() => {
+    const allLessonIds = new Set(course.modules.flatMap(m => m.lessons.map(l => l.id)));
+    return completedLessons.filter(id => allLessonIds.has(id));
+  }, [completedLessons, course]);
+
   const progress = useMemo(() => {
-    return (completedLessons.length / totalLessons) * 100;
-  }, [completedLessons, totalLessons]);
+    if (totalLessons === 0) return 0;
+    return (validCompletedLessons.length / totalLessons) * 100;
+  }, [validCompletedLessons, totalLessons]);
 
   const handleNext = () => {
     if (currentLessonIndex < currentModule.lessons.length - 1) {
@@ -139,9 +145,9 @@ export default function App() {
   };
 
   const toggleLessonCompletion = (lessonId: string) => {
-    const newCompleted = completedLessons.includes(lessonId) 
-      ? completedLessons.filter(id => id !== lessonId)
-      : [...completedLessons, lessonId];
+    const newCompleted = validCompletedLessons.includes(lessonId) 
+      ? validCompletedLessons.filter(id => id !== lessonId)
+      : [...validCompletedLessons, lessonId];
     
     setCompletedLessons(newCompleted);
     saveProgress(newCompleted);
@@ -156,7 +162,7 @@ export default function App() {
     setQuizSubmitted(prev => ({ ...prev, [lessonId]: true }));
     
     if (percentage >= 80) {
-      if (!completedLessons.includes(lessonId)) {
+      if (!validCompletedLessons.includes(lessonId)) {
         toggleLessonCompletion(lessonId);
       }
     }
@@ -276,7 +282,7 @@ export default function App() {
                 <div className="space-y-1">
                   {module.lessons.map((lesson, lIdx) => {
                     const isActive = currentModuleIndex === mIdx && currentLessonIndex === lIdx;
-                    const isCompleted = completedLessons.includes(lesson.id);
+                    const isCompleted = validCompletedLessons.includes(lesson.id);
                     
                     return (
                       <button

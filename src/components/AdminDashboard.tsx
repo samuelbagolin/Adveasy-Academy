@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db, firebaseConfig } from '../firebase';
 import { ref, onValue, set, remove, update } from 'firebase/database';
 import { initializeApp, getApps } from 'firebase/app';
@@ -46,25 +46,31 @@ export default function AdminDashboard({ onBack, course }: AdminDashboardProps) 
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
   const totalLessons = course.modules.reduce((acc: number, mod: any) => acc + mod.lessons.length, 0);
+  const allLessonIds = useMemo(() => new Set(course.modules.flatMap((m: any) => m.lessons.map((l: any) => l.id))), [course]);
 
   useEffect(() => {
     const usersRef = ref(db, 'users');
     const unsubscribe = onValue(usersRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        const userList = Object.entries(data).map(([uid, profile]: [string, any]) => ({
-          uid,
-          email: profile.email || 'N/A',
-          completedLessons: profile.progress?.completedLessons || [],
-          lastLogin: profile.lastLogin || 0,
-        }));
+        const userList = Object.entries(data).map(([uid, profile]: [string, any]) => {
+          const rawCompleted = profile.progress?.completedLessons || [];
+          const validCompleted = rawCompleted.filter((id: string) => allLessonIds.has(id));
+          
+          return {
+            uid,
+            email: profile.email || 'N/A',
+            completedLessons: validCompleted,
+            lastLogin: profile.lastLogin || 0,
+          };
+        });
         setUsers(userList);
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [allLessonIds]);
 
   const filteredUsers = users.filter(user => 
     user.email.toLowerCase().includes(searchTerm.toLowerCase())
