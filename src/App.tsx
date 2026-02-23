@@ -440,6 +440,11 @@ export default function App() {
                     thead: ({ children }) => <thead className="bg-slate-800/50 text-slate-200">{children}</thead>,
                     th: ({ children }) => <th className="p-4 font-bold border-b border-slate-800">{children}</th>,
                     td: ({ children }) => <td className="p-4 text-slate-400 border-b border-slate-800">{children}</td>,
+                    blockquote: ({ children }) => (
+                      <blockquote className="my-8 p-6 bg-primary-900/10 border-l-4 border-primary-500 rounded-r-xl italic text-slate-300">
+                        {children}
+                      </blockquote>
+                    ),
                   }}
                 >
                   {currentLesson.content}
