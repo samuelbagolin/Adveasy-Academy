@@ -23,6 +23,7 @@ import { courseData } from '../courseData';
 
 interface UserStats {
   email: string;
+  name?: string;
   completedLessons: string[];
   lastLogin: number;
   uid: string;
@@ -40,8 +41,10 @@ export default function AdminDashboard({ onBack, course }: AdminDashboardProps) 
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddUser, setShowAddUser] = useState(false);
   const [showEditUser, setShowEditUser] = useState<UserStats | null>(null);
+  const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
@@ -60,6 +63,7 @@ export default function AdminDashboard({ onBack, course }: AdminDashboardProps) 
           return {
             uid,
             email: profile.email || 'N/A',
+            name: profile.name || '',
             completedLessons: validCompleted,
             lastLogin: profile.lastLogin || 0,
           };
@@ -93,6 +97,7 @@ export default function AdminDashboard({ onBack, course }: AdminDashboardProps) 
       // Save user profile to database
       await set(ref(db, `users/${newUser.uid}`), {
         email: newEmail,
+        name: newName,
         role: 'student',
         createdAt: Date.now(),
         lastLogin: Date.now()
@@ -104,6 +109,7 @@ export default function AdminDashboard({ onBack, course }: AdminDashboardProps) 
       setShowAddUser(false);
       setNewEmail('');
       setNewPassword('');
+      setNewName('');
       alert('Usuário criado com sucesso no Firebase!');
     } catch (err: any) {
       console.error(err);
@@ -120,7 +126,8 @@ export default function AdminDashboard({ onBack, course }: AdminDashboardProps) 
     setActionLoading(true);
     try {
       await update(ref(db, `users/${showEditUser.uid}`), {
-        email: editEmail
+        email: editEmail,
+        name: editName
       });
       setShowEditUser(null);
       alert('E-mail atualizado no banco de dados!');
@@ -255,8 +262,8 @@ export default function AdminDashboard({ onBack, course }: AdminDashboardProps) 
                               {user.email[0].toUpperCase()}
                             </div>
                             <div className="flex flex-col">
-                              <span className="font-medium">{user.email}</span>
-                              <span className="text-xs text-slate-500">ID: {user.uid.slice(0, 8)}...</span>
+                              <span className="font-medium">{user.name || user.email.split('@')[0]}</span>
+                              <span className="text-xs text-slate-500">{user.email}</span>
                             </div>
                           </div>
                         </td>
@@ -303,12 +310,13 @@ export default function AdminDashboard({ onBack, course }: AdminDashboardProps) 
                                       onClick={() => {
                                         setShowEditUser(user);
                                         setEditEmail(user.email);
+                                        setEditName(user.name || '');
                                         setActiveMenu(null);
                                       }}
                                       className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-200 hover:bg-slate-700 transition-colors"
                                     >
                                       <Edit2 size={16} className="text-primary-400" />
-                                      Editar E-mail
+                                      Editar Aluno
                                     </button>
                                     <button
                                       onClick={() => {
@@ -351,6 +359,20 @@ export default function AdminDashboard({ onBack, course }: AdminDashboardProps) 
                 Convidar Novo Aluno
               </h3>
               <form onSubmit={handleAddUser} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm text-slate-400">Nome do Aluno</label>
+                  <div className="relative">
+                    <Users className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                    <input 
+                      type="text" 
+                      required
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-primary-500"
+                      placeholder="Nome completo"
+                    />
+                  </div>
+                </div>
                 <div className="space-y-2">
                   <label className="text-sm text-slate-400">E-mail do Aluno</label>
                   <div className="relative">
@@ -422,6 +444,20 @@ export default function AdminDashboard({ onBack, course }: AdminDashboardProps) 
                 Editar Aluno
               </h3>
               <form onSubmit={handleEditUser} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm text-slate-400">Nome do Aluno</label>
+                  <div className="relative">
+                    <Users className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                    <input 
+                      type="text" 
+                      required
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-primary-500"
+                      placeholder="Nome completo"
+                    />
+                  </div>
+                </div>
                 <div className="space-y-2">
                   <label className="text-sm text-slate-400">E-mail do Aluno</label>
                   <div className="relative">

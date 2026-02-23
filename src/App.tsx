@@ -30,6 +30,7 @@ import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { ref, onValue, set, update } from 'firebase/database';
 import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
+import Certificate from './components/Certificate';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -45,6 +46,8 @@ export default function App() {
   const [currentModuleIndex, setCurrentModuleIndex] = useState(0);
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [showCertificate, setShowCertificate] = useState(false);
+  const [userName, setUserName] = useState('');
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
   const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({});
   const [quizSubmitted, setQuizSubmitted] = useState<Record<string, boolean>>({});
@@ -80,11 +83,14 @@ export default function App() {
 
           setUser(u);
           
-          // Update last login
-          update(userRef, {
-            email: u.email,
-            lastLogin: Date.now()
-          });
+          if (data) {
+            if (data.name) setUserName(data.name);
+            // Update last login
+            update(userRef, {
+              email: u.email,
+              lastLogin: Date.now()
+            });
+          }
 
           if (data && data.progress && data.progress.completedLessons) {
             setCompletedLessons(data.progress.completedLessons);
@@ -271,6 +277,18 @@ export default function App() {
                 className="h-full bg-primary-500"
               />
             </div>
+
+            {progress === 100 && (
+              <motion.button
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                onClick={() => setShowCertificate(true)}
+                className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-emerald-900/20"
+              >
+                <Award size={18} />
+                Emitir Certificado
+              </motion.button>
+            )}
           </div>
 
           <nav className="flex-1 overflow-y-auto p-4 space-y-6">
@@ -599,6 +617,16 @@ export default function App() {
           </div>
         </div>
       </main>
+
+      <AnimatePresence>
+        {showCertificate && (
+          <Certificate 
+            userName={userName || user?.email?.split('@')[0] || 'Aluno'} 
+            courseTitle={course.title}
+            onClose={() => setShowCertificate(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
