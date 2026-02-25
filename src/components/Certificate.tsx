@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import html2canvas from 'html2canvas';
+import { domToPng } from 'modern-screenshot';
 import { jsPDF } from 'jspdf';
 import { Award, Download, X, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -21,37 +21,29 @@ export default function Certificate({ userName, courseTitle, onClose }: Certific
     try {
       const element = certificateRef.current;
       
-      const canvas = await html2canvas(element, {
+      // modern-screenshot is much better at handling modern CSS like oklch
+      const dataUrl = await domToPng(element, {
         scale: 2,
-        useCORS: true,
         backgroundColor: '#ffffff',
-        logging: false,
         width: 1123,
         height: 794,
-        onclone: (clonedDoc) => {
-          const clonedElement = clonedDoc.getElementById('certificate-to-print');
-          if (clonedElement instanceof HTMLElement) {
-            // Remove any Tailwind-injected transforms or scales
-            clonedElement.style.transform = 'none';
-            clonedElement.style.scale = '1';
-            clonedElement.style.margin = '0';
-            clonedElement.style.padding = '80px';
-            clonedElement.style.display = 'flex';
-            
-            // Ensure the cloned document body doesn't have overflow issues
-            clonedDoc.body.style.overflow = 'visible';
-          }
+        style: {
+          transform: 'none',
+          scale: '1',
+          margin: '0',
+          padding: '80px',
+          display: 'flex',
+          visibility: 'visible',
         }
       });
       
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
       const pdf = new jsPDF({
         orientation: 'landscape',
         unit: 'px',
         format: [1123, 794]
       });
       
-      pdf.addImage(imgData, 'JPEG', 0, 0, 1123, 794);
+      pdf.addImage(dataUrl, 'PNG', 0, 0, 1123, 794);
       pdf.save(`Certificado-${userName.replace(/\s+/g, '-')}.pdf`);
     } catch (error) {
       console.error('Error generating certificate:', error);
