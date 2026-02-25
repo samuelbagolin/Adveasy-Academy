@@ -276,6 +276,7 @@ export default function AdminDashboard({ onBack, courses }: AdminDashboardProps)
     const updatedCourses = [...courses];
     const courseIdx = updatedCourses.findIndex(c => c.id === selectedCourseId);
     if (courseIdx !== -1) {
+      if (!updatedCourses[courseIdx].modules) updatedCourses[courseIdx].modules = [];
       const module = updatedCourses[courseIdx].modules.find((m: any) => m.id === moduleId);
       if (module) {
         if (!module.lessons) module.lessons = [];
@@ -297,6 +298,7 @@ export default function AdminDashboard({ onBack, courses }: AdminDashboardProps)
     const updatedCourses = [...courses];
     const courseIdx = updatedCourses.findIndex(c => c.id === selectedCourseId);
     if (courseIdx !== -1) {
+      if (!updatedCourses[courseIdx].modules) updatedCourses[courseIdx].modules = [];
       updatedCourses[courseIdx].modules = updatedCourses[courseIdx].modules.filter((m: any) => m.id !== moduleId);
       try {
         await set(ref(db, 'courses'), updatedCourses);
@@ -312,8 +314,10 @@ export default function AdminDashboard({ onBack, courses }: AdminDashboardProps)
     const updatedCourses = [...courses];
     const courseIdx = updatedCourses.findIndex(c => c.id === selectedCourseId);
     if (courseIdx !== -1) {
+      if (!updatedCourses[courseIdx].modules) updatedCourses[courseIdx].modules = [];
       const module = updatedCourses[courseIdx].modules.find((m: any) => m.id === moduleId);
       if (module) {
+        if (!module.lessons) module.lessons = [];
         module.lessons = module.lessons.filter((l: any) => l.id !== lessonId);
         try {
           await set(ref(db, 'courses'), updatedCourses);
@@ -622,54 +626,69 @@ export default function AdminDashboard({ onBack, courses }: AdminDashboardProps)
                 </div>
 
                 <div className="grid gap-6">
-                  {selectedCourse?.modules?.map((module: any) => (
-                    <div key={module.id} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-                      <div className="p-6 bg-slate-800/50 border-b border-slate-800 flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-xl bg-primary-500/10 text-primary-500 flex items-center justify-center font-bold">
-                            {selectedCourse.modules.indexOf(module) + 1}
-                          </div>
-                          <h3 className="text-lg font-bold">{module.title}</h3>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button 
-                            onClick={() => setShowAddLesson(module.id)}
-                            className="p-2 hover:bg-slate-700 rounded-lg text-emerald-400 transition-colors flex items-center gap-2 text-sm"
-                          >
-                            <Plus size={18} />
-                            Nova Lição
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteModule(module.id)}
-                            className="p-2 hover:bg-red-900/20 rounded-lg text-red-400 transition-colors"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="p-4">
-                        <div className="grid gap-2">
-                          {module.lessons.map((lesson: any) => (
-                            <div key={lesson.id} className="flex items-center justify-between p-4 bg-slate-800/30 rounded-xl border border-slate-800 hover:border-slate-700 transition-all group">
-                              <div className="flex items-center gap-3">
-                                <BookOpen size={16} className="text-slate-500" />
-                                <span className="font-medium">{lesson.title}</span>
-                              </div>
-                              <button 
-                                onClick={() => handleDeleteLesson(module.id, lesson.id)}
-                                className="p-2 opacity-0 group-hover:opacity-100 hover:bg-red-900/20 rounded-lg text-red-400 transition-all"
-                              >
-                                <Trash2 size={16} />
-                              </button>
+                  {selectedCourse?.modules && selectedCourse.modules.length > 0 ? (
+                    selectedCourse.modules.map((module: any) => (
+                      <div key={module.id} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                        <div className="p-6 bg-slate-800/50 border-b border-slate-800 flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-xl bg-primary-500/10 text-primary-500 flex items-center justify-center font-bold">
+                              {(selectedCourse?.modules || []).indexOf(module) + 1}
                             </div>
-                          ))}
-                          {module.lessons.length === 0 && (
-                            <p className="text-center py-4 text-slate-500 text-sm italic">Nenhuma lição neste módulo.</p>
-                          )}
+                            <h3 className="text-lg font-bold">{module.title}</h3>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button 
+                              onClick={() => setShowAddLesson(module.id)}
+                              className="p-2 hover:bg-slate-700 rounded-lg text-emerald-400 transition-colors flex items-center gap-2 text-sm"
+                            >
+                              <Plus size={18} />
+                              Nova Lição
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteModule(module.id)}
+                              className="p-2 hover:bg-red-900/20 rounded-lg text-red-400 transition-colors"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="p-4">
+                          <div className="grid gap-2">
+                            {(module.lessons || []).map((lesson: any) => (
+                              <div key={lesson.id} className="flex items-center justify-between p-4 bg-slate-800/30 rounded-xl border border-slate-800 hover:border-slate-700 transition-all group">
+                                <div className="flex items-center gap-3">
+                                  <BookOpen size={16} className="text-slate-500" />
+                                  <span className="font-medium">{lesson.title}</span>
+                                </div>
+                                <button 
+                                  onClick={() => handleDeleteLesson(module.id, lesson.id)}
+                                  className="p-2 opacity-0 group-hover:opacity-100 hover:bg-red-900/20 rounded-lg text-red-400 transition-all"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            ))}
+                            {(!module.lessons || module.lessons.length === 0) && (
+                              <p className="text-center py-4 text-slate-500 text-sm italic">Nenhuma lição neste módulo.</p>
+                            )}
+                          </div>
                         </div>
                       </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-20 bg-slate-900/50 border border-dashed border-slate-800 rounded-2xl">
+                      <BookOpen size={48} className="mx-auto text-slate-700 mb-4" />
+                      <h3 className="text-lg font-bold text-slate-300">Nenhum módulo encontrado</h3>
+                      <p className="text-slate-500 mb-6">Comece adicionando o primeiro módulo ao seu curso.</p>
+                      <button 
+                        onClick={() => setShowAddModule(true)}
+                        className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-xl font-bold transition-all inline-flex items-center gap-2"
+                      >
+                        <Plus size={18} />
+                        Adicionar Módulo
+                      </button>
                     </div>
-                  ))}
+                  )}
                 </div>
               </>
             )}
