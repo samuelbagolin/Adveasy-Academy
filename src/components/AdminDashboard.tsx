@@ -18,9 +18,10 @@ import {
   Edit2,
   Lock,
   Plus,
-  Image as ImageIcon
+  Image as ImageIcon,
+  GripVertical
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, Reorder } from 'motion/react';
 import { cn } from '../lib/utils';
 
 interface UserStats {
@@ -34,9 +35,10 @@ interface UserStats {
 interface AdminDashboardProps {
   onBack: () => void;
   courses: any[];
+  onUpdateCourses: (courses: any[]) => void;
 }
 
-export default function AdminDashboard({ onBack, courses }: AdminDashboardProps) {
+export default function AdminDashboard({ onBack, courses, onUpdateCourses }: AdminDashboardProps) {
   const [users, setUsers] = useState<UserStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -328,6 +330,10 @@ export default function AdminDashboard({ onBack, courses }: AdminDashboardProps)
     }
   };
 
+  const handleReorderCourses = (newOrder: any[]) => {
+    onUpdateCourses(newOrder);
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
       {/* Header */}
@@ -560,11 +566,25 @@ export default function AdminDashboard({ onBack, courses }: AdminDashboardProps)
               <>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-2xl font-bold">Cursos Disponíveis</h2>
-                  <p className="text-slate-400 text-sm">Gerencie os cursos da plataforma.</p>
+                  <p className="text-slate-400 text-sm">Arraste os cursos para reordenar.</p>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <Reorder.Group 
+                  axis="y" 
+                  values={courses} 
+                  onReorder={handleReorderCourses}
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                >
                   {courses.map((c) => (
-                    <div key={c.id} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex flex-col group">
+                    <Reorder.Item 
+                      key={c.id} 
+                      value={c}
+                      whileDrag={{ 
+                        scale: 1.02, 
+                        zIndex: 50,
+                        boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.5)"
+                      }}
+                      className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex flex-col group cursor-default relative"
+                    >
                       <div className="aspect-video bg-slate-800 relative overflow-hidden">
                         {c.thumbnail ? (
                           <img src={c.thumbnail} alt={c.title} className="w-full h-full object-cover" />
@@ -573,9 +593,16 @@ export default function AdminDashboard({ onBack, courses }: AdminDashboardProps)
                             <BookOpen size={40} className="text-slate-700" />
                           </div>
                         )}
+                        
+                        {/* Drag Handle */}
+                        <div className="absolute top-2 left-2 p-1.5 bg-black/50 backdrop-blur-md rounded-lg text-white/50 group-hover:text-white cursor-grab active:cursor-grabbing transition-colors">
+                          <GripVertical size={16} />
+                        </div>
+
                         <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button 
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setShowEditCourseInfo(c);
                               setNewCourseTitle(c.title);
                               setNewCourseDesc(c.description);
@@ -586,7 +613,10 @@ export default function AdminDashboard({ onBack, courses }: AdminDashboardProps)
                             <Edit2 size={16} />
                           </button>
                           <button 
-                            onClick={() => handleDeleteCourse(c.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteCourse(c.id);
+                            }}
                             className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
                           >
                             <Trash2 size={16} />
@@ -604,9 +634,9 @@ export default function AdminDashboard({ onBack, courses }: AdminDashboardProps)
                           <ChevronRight size={16} />
                         </button>
                       </div>
-                    </div>
+                    </Reorder.Item>
                   ))}
-                </div>
+                </Reorder.Group>
               </>
             ) : (
               <>

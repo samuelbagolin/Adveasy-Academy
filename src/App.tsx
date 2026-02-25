@@ -24,9 +24,10 @@ import {
   Trash2,
   FileText,
   Upload,
-  Download
+  Download,
+  GripVertical
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, Reorder } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { clsx, type ClassValue } from 'clsx';
@@ -271,7 +272,16 @@ export default function App() {
   }
 
   if (showAdmin && isAdmin) {
-    return <AdminDashboard onBack={() => setShowAdmin(false)} courses={courses} />;
+    return (
+      <AdminDashboard 
+        onBack={() => setShowAdmin(false)} 
+        courses={courses} 
+        onUpdateCourses={(newCourses) => {
+          setCourses(newCourses);
+          set(ref(db, 'courses'), newCourses);
+        }}
+      />
+    );
   }
 
   if (!selectedCourseId) {
@@ -309,15 +319,34 @@ export default function App() {
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="mb-12">
             <h1 className="text-4xl font-extrabold mb-4">Seus Cursos</h1>
-            <p className="text-slate-400 text-lg">Continue sua jornada de aprendizado e domine a advocacia moderna.</p>
+            <p className="text-slate-400 text-lg">
+              {isAdmin ? 'Arraste os cards para reordenar a exibição para todos os alunos.' : 'Continue sua jornada de aprendizado e domine a advocacia moderna.'}
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <Reorder.Group 
+            axis="y" 
+            values={courses} 
+            onReorder={(newOrder) => {
+              if (isAdmin) {
+                setCourses(newOrder);
+                set(ref(db, 'courses'), newOrder);
+              }
+            }}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+          >
             {courses.map((c) => (
-              <motion.div
+              <Reorder.Item
                 key={c.id}
-                whileHover={{ y: -5 }}
-                className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden flex flex-col shadow-xl"
+                value={c}
+                drag={isAdmin ? "y" : false}
+                whileDrag={{ 
+                  scale: 1.02, 
+                  zIndex: 50,
+                  boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.5)"
+                }}
+                whileHover={isAdmin ? {} : { y: -5 }}
+                className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden flex flex-col shadow-xl cursor-default relative"
               >
                 <div className="aspect-video relative overflow-hidden bg-slate-800">
                   {c.thumbnail ? (
@@ -337,6 +366,11 @@ export default function App() {
                       Curso
                     </span>
                   </div>
+                  {isAdmin && (
+                    <div className="absolute top-4 right-4 p-2 bg-black/50 backdrop-blur-md rounded-lg text-white/50 group-hover:text-white cursor-grab active:cursor-grabbing transition-colors">
+                      <GripVertical size={18} />
+                    </div>
+                  )}
                 </div>
                 <div className="p-6 flex-1 flex flex-col">
                   <h3 className="text-xl font-bold mb-3 line-clamp-2">{c.title}</h3>
@@ -351,9 +385,9 @@ export default function App() {
                     <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                   </button>
                 </div>
-              </motion.div>
+              </Reorder.Item>
             ))}
-          </div>
+          </Reorder.Group>
         </main>
       </div>
     );
