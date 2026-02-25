@@ -16,7 +16,15 @@ import {
   ArrowRight,
   GraduationCap,
   LogOut,
-  LayoutDashboard
+  LayoutDashboard,
+  LayoutGrid,
+  Home,
+  Settings,
+  Plus,
+  Trash2,
+  FileText,
+  Upload,
+  Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
@@ -24,10 +32,11 @@ import remarkGfm from 'remark-gfm';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { courseData } from './courseData';
-import { Question } from './types';
-import { auth, db } from './firebase';
+import { Question, Course } from './types';
+import { auth, db, storage } from './firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { ref, onValue, set, update } from 'firebase/database';
+import { ref as sRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
 import Certificate from './components/Certificate';
@@ -40,9 +49,16 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [showAdmin, setShowAdmin] = useState(false);
-  const [course, setCourse] = useState(courseData);
+  const [courses, setCourses] = useState<Course[]>(courseData);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
+  const [editImageUrl, setEditImageUrl] = useState('');
+  const [editVideoUrl, setEditVideoUrl] = useState('');
+  const [editPdfUrl, setEditPdfUrl] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editQuiz, setEditQuiz] = useState<Question[]>([]);
   const [currentModuleIndex, setCurrentModuleIndex] = useState(0);
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -54,13 +70,19 @@ export default function App() {
 
   const isAdmin = user?.email === 'contato@adveasy.com.br';
 
+  const selectedCourse = useMemo(() => 
+    courses.find(c => c.id === selectedCourseId) || courses[0],
+  [courses, selectedCourseId]);
+
   useEffect(() => {
-    // Load course from Firebase
-    const courseRef = ref(db, 'course');
-    onValue(courseRef, (snapshot) => {
+    // Load courses from Firebase
+    const coursesRef = ref(db, 'courses');
+    onValue(coursesRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        setCourse(data);
+        // Handle both object and array from Firebase
+        const coursesList = Array.isArray(data) ? data : Object.values(data);
+        setCourses(coursesList as Course[]);
       }
     });
 
@@ -112,17 +134,19 @@ export default function App() {
     }
   };
 
-  const currentModule = course.modules[currentModuleIndex];
-  const currentLesson = currentModule.lessons[currentLessonIndex];
+  const currentModule = selectedCourse?.modules?.[currentModuleIndex] || { title: '', lessons: [] };
+  const currentLesson = currentModule?.lessons?.[currentLessonIndex] || { id: '', title: '', content: '' };
 
   const totalLessons = useMemo(() => {
-    return course.modules.reduce((acc, mod) => acc + mod.lessons.length, 0);
-  }, [course]);
+    if (!selectedCourse?.modules) return 0;
+    return selectedCourse.modules.reduce((acc, mod) => acc + (mod.lessons?.length || 0), 0);
+  }, [selectedCourse]);
 
   const validCompletedLessons = useMemo(() => {
-    const allLessonIds = new Set(course.modules.flatMap(m => m.lessons.map(l => l.id)));
+    if (!selectedCourse?.modules) return [];
+    const allLessonIds = new Set(selectedCourse.modules.flatMap(m => (m.lessons || []).map(l => l.id)));
     return completedLessons.filter(id => allLessonIds.has(id));
-  }, [completedLessons, course]);
+  }, [completedLessons, selectedCourse]);
 
   const progress = useMemo(() => {
     if (totalLessons === 0) return 0;
@@ -132,7 +156,7 @@ export default function App() {
   const handleNext = () => {
     if (currentLessonIndex < currentModule.lessons.length - 1) {
       setCurrentLessonIndex(currentLessonIndex + 1);
-    } else if (currentModuleIndex < course.modules.length - 1) {
+    } else if (currentModuleIndex < selectedCourse.modules.length - 1) {
       setCurrentModuleIndex(currentModuleIndex + 1);
       setCurrentLessonIndex(0);
     }
@@ -143,7 +167,7 @@ export default function App() {
     if (currentLessonIndex > 0) {
       setCurrentLessonIndex(currentLessonIndex - 1);
     } else if (currentModuleIndex > 0) {
-      const prevModule = course.modules[currentModuleIndex - 1];
+      const prevModule = selectedCourse.modules[currentModuleIndex - 1];
       setCurrentModuleIndex(currentModuleIndex - 1);
       setCurrentLessonIndex(prevModule.lessons.length - 1);
     }
@@ -183,11 +207,47 @@ export default function App() {
     });
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      alert('Por favor, selecione um arquivo PDF.');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      if (!storage) {
+        throw new Error('O serviço de armazenamento (Firebase Storage) não está disponível. Verifique se ele está ativado no console do Firebase.');
+      }
+      const fileRef = sRef(storage, `lessons/pdfs/${Date.now()}_${file.name}`);
+      await uploadBytes(fileRef, file);
+      const url = await getDownloadURL(fileRef);
+      setEditPdfUrl(url);
+    } catch (error) {
+      console.error('Erro ao subir PDF:', error);
+      alert('Erro ao subir o PDF. Tente novamente.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleSaveEdit = () => {
-    const newCourse = { ...course };
-    newCourse.modules[currentModuleIndex].lessons[currentLessonIndex].content = editContent;
-    setCourse(newCourse);
-    set(ref(db, 'course'), newCourse);
+    const newCourses = [...courses];
+    const courseIdx = newCourses.findIndex(c => c.id === selectedCourseId);
+    if (courseIdx === -1) return;
+
+    const lesson = newCourses[courseIdx].modules[currentModuleIndex].lessons[currentLessonIndex];
+    lesson.title = editTitle;
+    lesson.content = editContent;
+    lesson.imageUrl = editImageUrl;
+    lesson.videoUrl = editVideoUrl;
+    lesson.pdfUrl = editPdfUrl;
+    lesson.quiz = editQuiz.length > 0 ? editQuiz : undefined;
+    
+    setCourses(newCourses);
+    set(ref(db, 'courses'), newCourses);
     setIsEditing(false);
   };
 
@@ -211,7 +271,92 @@ export default function App() {
   }
 
   if (showAdmin && isAdmin) {
-    return <AdminDashboard onBack={() => setShowAdmin(false)} course={course} />;
+    return <AdminDashboard onBack={() => setShowAdmin(false)} courses={courses} />;
+  }
+
+  if (!selectedCourseId) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
+        <header className="bg-slate-900/50 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary-500 rounded-xl">
+                <GraduationCap size={24} className="text-white" />
+              </div>
+              <span className="text-xl font-bold tracking-tight">Adveasy Academy</span>
+            </div>
+            <div className="flex items-center gap-4">
+              {isAdmin && (
+                <button 
+                  onClick={() => setShowAdmin(true)}
+                  className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 transition-colors flex items-center gap-2"
+                >
+                  <LayoutDashboard size={20} />
+                  <span className="hidden sm:inline">Painel</span>
+                </button>
+              )}
+              <button 
+                onClick={() => signOut(auth)}
+                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 transition-colors flex items-center gap-2"
+              >
+                <LogOut size={20} />
+                <span className="hidden sm:inline">Sair</span>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="mb-12">
+            <h1 className="text-4xl font-extrabold mb-4">Seus Cursos</h1>
+            <p className="text-slate-400 text-lg">Continue sua jornada de aprendizado e domine a advocacia moderna.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {courses.map((c) => (
+              <motion.div
+                key={c.id}
+                whileHover={{ y: -5 }}
+                className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden flex flex-col shadow-xl"
+              >
+                <div className="aspect-video relative overflow-hidden bg-slate-800">
+                  {c.thumbnail ? (
+                    <img 
+                      src={c.thumbnail} 
+                      alt={c.title} 
+                      className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <BookOpen size={48} className="text-slate-700" />
+                    </div>
+                  )}
+                  <div className="absolute top-4 left-4">
+                    <span className="px-3 py-1 bg-primary-500 text-white text-xs font-bold rounded-full uppercase tracking-wider">
+                      Curso
+                    </span>
+                  </div>
+                </div>
+                <div className="p-6 flex-1 flex flex-col">
+                  <h3 className="text-xl font-bold mb-3 line-clamp-2">{c.title}</h3>
+                  <p className="text-slate-400 text-sm mb-6 line-clamp-3 flex-1">
+                    {c.description}
+                  </p>
+                  <button
+                    onClick={() => setSelectedCourseId(c.id)}
+                    className="w-full py-3 bg-slate-800 hover:bg-primary-600 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 group"
+                  >
+                    Acessar Curso
+                    <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </main>
+      </div>
+    );
   }
 
   return (
@@ -244,24 +389,37 @@ export default function App() {
         )}
       >
         <div className="w-[320px] h-full flex flex-col">
-          <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-            <div className="flex items-center gap-2 text-primary-500">
-              <GraduationCap size={28} />
-              <span className="font-bold text-lg tracking-tight">Adveasy Academy</span>
-            </div>
-            <div className="flex items-center gap-2">
-              {isAdmin && (
-                <button 
-                  onClick={() => setShowAdmin(true)}
-                  className="p-2 text-slate-400 hover:text-primary-500 transition-colors"
-                  title="Painel Admin"
-                >
-                  <LayoutDashboard size={20} />
-                </button>
-              )}
+          <div className="p-6 border-b border-slate-800">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-2 text-primary-500">
+                <GraduationCap size={28} />
+                <span className="font-bold text-lg tracking-tight">Adveasy Academy</span>
+              </div>
               <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-slate-400 hover:text-slate-200">
                 <X size={20} />
               </button>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Treinamentos</span>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setSelectedCourseId(null)}
+                  className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-primary-400 rounded-xl transition-all border border-slate-700/50"
+                  title="Voltar para Cursos"
+                >
+                  <Home size={20} />
+                </button>
+                {isAdmin && (
+                  <button 
+                    onClick={() => setShowAdmin(true)}
+                    className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-primary-400 rounded-xl transition-all border border-slate-700/50"
+                    title="Painel Admin"
+                  >
+                    <Settings size={20} />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -292,13 +450,13 @@ export default function App() {
           </div>
 
           <nav className="flex-1 overflow-y-auto p-4 space-y-6">
-            {course.modules.map((module, mIdx) => (
+            {selectedCourse?.modules?.map((module, mIdx) => (
               <div key={module.id} className="space-y-2">
                 <h3 className="px-2 text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
                   {module.title}
                 </h3>
                 <div className="space-y-1">
-                  {module.lessons.map((lesson, lIdx) => {
+                  {module.lessons?.map((lesson, lIdx) => {
                     const isActive = currentModuleIndex === mIdx && currentLessonIndex === lIdx;
                     const isCompleted = validCompletedLessons.includes(lesson.id);
                     
@@ -383,7 +541,7 @@ export default function App() {
             </button>
             <button
               onClick={handleNext}
-              disabled={currentModuleIndex === course.modules.length - 1 && currentLessonIndex === currentModule.lessons.length - 1}
+              disabled={currentModuleIndex === (selectedCourse?.modules?.length || 0) - 1 && currentLessonIndex === (currentModule?.lessons?.length || 0) - 1}
               className="p-2 text-slate-400 hover:bg-slate-800 rounded-lg disabled:opacity-30 disabled:hover:bg-transparent"
             >
               <ChevronRight size={20} />
@@ -409,6 +567,11 @@ export default function App() {
                   <button 
                     onClick={() => {
                       setEditContent(currentLesson.content);
+                      setEditImageUrl(currentLesson.imageUrl || '');
+                      setEditVideoUrl(currentLesson.videoUrl || '');
+                      setEditPdfUrl(currentLesson.pdfUrl || '');
+                      setEditTitle(currentLesson.title);
+                      setEditQuiz(currentLesson.quiz || []);
                       setIsEditing(true);
                     }}
                     className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1 rounded-lg transition-colors"
@@ -419,13 +582,160 @@ export default function App() {
               </div>
               
               {isEditing ? (
-                <div className="space-y-4">
-                  <textarea 
-                    value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
-                    className="w-full h-[500px] bg-slate-800 border border-slate-700 rounded-xl p-4 text-slate-100 font-mono text-sm focus:outline-none focus:border-primary-500"
-                  />
-                  <div className="flex gap-3">
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-400">Título da Lição</label>
+                    <input 
+                      type="text"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-400">Conteúdo (Markdown)</label>
+                    <textarea 
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      className="w-full h-[400px] bg-slate-800 border border-slate-700 rounded-xl p-4 text-slate-100 font-mono text-sm focus:outline-none focus:border-primary-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-400">URL da Imagem (opcional)</label>
+                      <input 
+                        type="text"
+                        value={editImageUrl}
+                        onChange={(e) => setEditImageUrl(e.target.value)}
+                        placeholder="https://exemplo.com/imagem.jpg"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-100 text-sm focus:outline-none focus:border-primary-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-400">URL do Vídeo (YouTube/Vimeo - opcional)</label>
+                      <input 
+                        type="text"
+                        value={editVideoUrl}
+                        onChange={(e) => setEditVideoUrl(e.target.value)}
+                        placeholder="https://youtube.com/watch?v=..."
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-100 text-sm focus:outline-none focus:border-primary-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-400">Material em PDF (opcional)</label>
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1 relative">
+                        <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                        <input 
+                          type="text"
+                          value={editPdfUrl}
+                          onChange={(e) => setEditPdfUrl(e.target.value)}
+                          placeholder="URL do PDF ou suba um arquivo"
+                          className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-10 pr-4 py-2 text-slate-100 text-sm focus:outline-none focus:border-primary-500"
+                        />
+                      </div>
+                      <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shrink-0">
+                        {isUploading ? (
+                          <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Upload size={18} />
+                        )}
+                        {isUploading ? 'Subindo...' : 'Subir PDF'}
+                        <input 
+                          type="file" 
+                          accept=".pdf" 
+                          className="hidden" 
+                          onChange={handleFileUpload}
+                          disabled={isUploading}
+                        />
+                      </label>
+                    </div>
+                    {editPdfUrl && (
+                      <p className="text-[10px] text-emerald-500 flex items-center gap-1">
+                        <CheckCircle2 size={10} /> PDF vinculado com sucesso
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-bold text-white">Quiz da Lição</h3>
+                      <button 
+                        onClick={() => {
+                          const newQuestion: Question = {
+                            id: Math.random().toString(36).substring(2, 9),
+                            text: 'Nova Pergunta',
+                            options: ['Opção 1', 'Opção 2', 'Opção 3', 'Opção 4'],
+                            correctAnswer: 0
+                          };
+                          setEditQuiz([...editQuiz, newQuestion]);
+                        }}
+                        className="text-xs bg-primary-600 hover:bg-primary-700 text-white px-3 py-1 rounded-lg transition-colors flex items-center gap-2"
+                      >
+                        <Plus size={14} />
+                        Adicionar Pergunta
+                      </button>
+                    </div>
+
+                    <div className="space-y-6">
+                      {editQuiz.map((q, qIdx) => (
+                        <div key={q.id} className="p-4 bg-slate-800/50 border border-slate-700 rounded-xl space-y-4">
+                          <div className="flex justify-between items-start">
+                            <span className="text-xs font-bold text-primary-500 uppercase">Pergunta {qIdx + 1}</span>
+                            <button 
+                              onClick={() => setEditQuiz(editQuiz.filter(item => item.id !== q.id))}
+                              className="text-red-400 hover:text-red-300 transition-colors"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                          <input 
+                            type="text"
+                            value={q.text}
+                            onChange={(e) => {
+                              const newList = [...editQuiz];
+                              newList[qIdx].text = e.target.value;
+                              setEditQuiz(newList);
+                            }}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-primary-500"
+                            placeholder="Texto da pergunta"
+                          />
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {q.options.map((opt, oIdx) => (
+                              <div key={oIdx} className="flex items-center gap-2">
+                                <input 
+                                  type="radio"
+                                  name={`correct-${q.id}`}
+                                  checked={q.correctAnswer === oIdx}
+                                  onChange={() => {
+                                    const newList = [...editQuiz];
+                                    newList[qIdx].correctAnswer = oIdx;
+                                    setEditQuiz(newList);
+                                  }}
+                                  className="accent-primary-500"
+                                />
+                                <input 
+                                  type="text"
+                                  value={opt}
+                                  onChange={(e) => {
+                                    const newList = [...editQuiz];
+                                    newList[qIdx].options[oIdx] = e.target.value;
+                                    setEditQuiz(newList);
+                                  }}
+                                  className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-300 text-xs focus:outline-none focus:border-primary-500"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-4 border-t border-slate-800">
                     <button 
                       onClick={() => setIsEditing(false)}
                       className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-bold transition-colors"
@@ -441,9 +751,53 @@ export default function App() {
                   </div>
                 </div>
               ) : (
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
+                <>
+                  {currentLesson.videoUrl && (
+                    <div className="mb-8 aspect-video rounded-2xl overflow-hidden border border-slate-800 bg-black">
+                      {currentLesson.videoUrl.includes('youtube.com') || currentLesson.videoUrl.includes('youtu.be') ? (
+                        <iframe
+                          src={`https://www.youtube.com/embed/${currentLesson.videoUrl.split('v=')[1]?.split('&')[0] || currentLesson.videoUrl.split('/').pop()}`}
+                          className="w-full h-full"
+                          allowFullScreen
+                        />
+                      ) : (
+                        <video src={currentLesson.videoUrl} controls className="w-full h-full" />
+                      )}
+                    </div>
+                  )}
+
+                  {currentLesson.imageUrl && (
+                    <div className="mb-8 rounded-2xl overflow-hidden border border-slate-800">
+                      <img src={currentLesson.imageUrl} alt={currentLesson.title} className="w-full h-auto object-cover" />
+                    </div>
+                  )}
+
+                  {currentLesson.pdfUrl && (
+                    <div className="mb-8 p-6 bg-slate-800/50 border border-slate-700 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 group">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-primary-500/10 text-primary-500 rounded-xl">
+                          <FileText size={24} />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-white">Material Complementar (PDF)</h4>
+                          <p className="text-sm text-slate-400">Clique para baixar ou visualizar o material.</p>
+                        </div>
+                      </div>
+                      <a 
+                        href={currentLesson.pdfUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="w-full sm:w-auto p-3 bg-slate-700 hover:bg-primary-600 text-white rounded-xl transition-all flex items-center justify-center gap-2"
+                      >
+                        <Download size={20} />
+                        <span className="font-bold text-sm">Download PDF</span>
+                      </a>
+                    </div>
+                  )}
+
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
                     h1: () => null, // Already rendered above
                     h2: ({ children }) => <h2 className="text-2xl font-bold text-slate-100 mt-12 mb-6">{children}</h2>,
                     h3: ({ children }) => <h3 className="text-xl font-bold text-slate-200 mt-8 mb-4">{children}</h3>,
@@ -473,8 +827,9 @@ export default function App() {
                 >
                   {currentLesson.content}
                 </ReactMarkdown>
-              )}
-            </div>
+              </>
+            )}
+          </div>
 
             {/* Quiz Section */}
             {currentLesson.quiz && (
@@ -608,7 +963,7 @@ export default function App() {
             
             <button
               onClick={handleNext}
-              disabled={currentModuleIndex === course.modules.length - 1 && currentLessonIndex === currentModule.lessons.length - 1}
+              disabled={currentModuleIndex === (selectedCourse?.modules?.length || 0) - 1 && currentLessonIndex === (currentModule?.lessons?.length || 0) - 1}
               className="flex items-center gap-2 bg-slate-100 text-slate-900 px-6 py-3 rounded-xl font-bold hover:bg-white transition-all disabled:opacity-30"
             >
               Próxima Lição
@@ -622,7 +977,7 @@ export default function App() {
         {showCertificate && (
           <Certificate 
             userName={userName || user?.email?.split('@')[0] || 'Aluno'} 
-            courseTitle={course.title}
+            courseTitle={selectedCourse.title}
             onClose={() => setShowCertificate(false)}
           />
         )}

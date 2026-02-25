@@ -1,7 +1,8 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getDatabase } from "firebase/database";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 export const firebaseConfig = {
   apiKey: "AIzaSyBJieZhszVNBByPbLKdPQju5jfP_YJmlgs",
@@ -14,8 +15,19 @@ export const firebaseConfig = {
   measurementId: "G-KZ53X6X5MY"
 };
 
-const app = initializeApp(firebaseConfig);
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 export const db = getDatabase(app);
 export const firestore = getFirestore(app);
+
+export const getStorageInstance = () => {
+  try {
+    return getStorage(app);
+  } catch (error) {
+    console.error("Firebase Storage not available:", error);
+    return null;
+  }
+};
+
+export const storage = getStorageInstance();
 export default app;

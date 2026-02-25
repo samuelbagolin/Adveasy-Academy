@@ -1,9 +1,12 @@
 import { Course } from "./types";
 
-export const courseData: Course = {
-  title: "Transformando Consultas Gratuitas em Clientes Pagos",
-  description: "O Método Adveasy para o Advogado Vendedor",
-  modules: [
+export const courseData: Course[] = [
+  {
+    id: "c1",
+    title: "Transformando Consultas Gratuitas em Clientes Pagos",
+    description: "O Método Adveasy para o Advogado Vendedor",
+    thumbnail: "https://picsum.photos/seed/course1/800/450",
+    modules: [
     {
       id: "m1",
       title: "1. A Mentalidade do Cliente",
@@ -31,33 +34,27 @@ Prepare-se para elevar sua prática jurídica a um novo patamar, tornando-se um 
           id: "l1-2",
           title: "1.2. Expectativas vs. Realidade",
           content: `
-# 1. A Mentalidade do Cliente: Entendendo para Conquistar
+Compreender a psicologia do cliente que busca uma consulta gratuita é o primeiro passo para uma conversão bem-sucedida. Longe de ser apenas uma busca por informação gratuita, é um momento de avaliação mútua, onde o cliente busca segurança, clareza e, acima de tudo, uma solução para sua dor.
 
-Compreender a **psicologia do cliente** que busca uma consulta gratuita é o primeiro passo para uma conversão bem-sucedida. Longe de ser apenas uma busca por informação gratuita, é um momento de avaliação mútua, onde o cliente busca segurança, clareza e, acima de tudo, uma solução para sua dor.
+1.1. Expectativas vs. Realidade: Gerenciando a Percepção
+Clientes que procuram consultas gratuitas frequentemente chegam com altas expectativas:
 
-## 1.1. Expectativas vs. Realidade: Gerenciando a Percepção
+Soluções Imediatas: Esperam respostas rápidas e diretas para problemas complexos.
+Orientação Abrangente: Desejam uma análise completa do caso sem custo.
+Profissionalismo e Empatia: Buscam ser ouvidos e compreendidos em suas angústias.
+No entanto, a realidade da advocacia impõe limites:
 
-Clientes que procuram consultas gratuitas frequentemente chegam com **altas expectativas**:
+Tempo Restrito: Consultas gratuitas possuem duração limitada.
+Complexidade Legal: Muitos casos exigem análise aprofundada que não pode ser feita em uma única sessão.
+Foco na Qualificação: O objetivo principal é qualificar o lead, não resolver o caso gratuitamente.
+Como o Advogado Vendedor Gerencia Isso?
+É crucial alinhar as expectativas desde o início. Comunique claramente o propósito da consulta gratuita: uma oportunidade para entender o problema do cliente, apresentar uma visão geral das possíveis soluções e, principalmente, demonstrar seu valor como profissional. Transforme a consulta gratuita em uma degustação de sua expertise, não em uma solução completa.
 
-*   **Soluções Imediatas:** Esperam respostas rápidas e diretas para problemas complexos.
-*   **Orientação Abrangente:** Desejam uma análise completa do caso sem custo.
-*   **Profissionalismo e Empatia:** Buscam ser ouvidos e compreendidos em suas angústias.
+Exemplo Prático:
 
-No entanto, a **realidade da advocacia** impõe limites:
+Em vez de dizer: “Não posso resolver seu caso agora, é só uma consulta gratuita.”
 
-*   **Tempo Restrito:** Consultas gratuitas possuem duração limitada.
-*   **Complexidade Legal:** Muitos casos exigem análise aprofundada que não pode ser feita em uma única sessão.
-*   **Foco na Qualificação:** O objetivo principal é qualificar o lead, não resolver o caso gratuitamente.
-
-### Como o Advogado Vendedor Gerencia Isso?
-
-É crucial **alinhar as expectativas** desde o início. Comunique claramente o propósito da consulta gratuita: uma oportunidade para entender o problema do cliente, apresentar uma visão geral das possíveis soluções e, principalmente, demonstrar seu valor como profissional. Transforme a consulta gratuita em uma **degustação de sua expertise**, não em uma solução completa.
-
-> **Exemplo Prático:**
-> 
-> Em vez de dizer: *“Não posso resolver seu caso agora, é só uma consulta gratuita.”*
-> 
-> **Diga:** *“Nesta consulta inicial, meu objetivo é entender a fundo sua situação e te dar uma visão clara dos caminhos jurídicos possíveis. Ao final, você terá uma compreensão melhor do seu problema e de como posso te ajudar a alcançar a melhor solução. Se sentir que meu trabalho faz sentido para você, podemos então discutir os próximos passos para uma assessoria completa.”*
+Diga: “Nesta consulta inicial, meu objetivo é entender a fundo sua situação e te dar uma visão clara dos caminhos jurídicos possíveis. Ao final, você terá uma compreensão melhor do seu problema e de como posso te ajudar a alcançar a melhor solução. Se sentir que meu trabalho faz sentido para você, podemos então discutir os próximos passos para uma assessoria completa.”
           `
         },
         {
@@ -405,4 +402,5 @@ Implemente os princípios do Método Adveasy e prepare-se para uma prática jur�
       ]
     }
   ]
-};
+ }
+];

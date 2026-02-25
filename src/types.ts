@@ -22,6 +22,9 @@ export interface Lesson {
   id: string;
   title: string;
   content: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  pdfUrl?: string;
   quiz?: Question[];
 }
 
@@ -32,7 +35,9 @@ export interface Module {
 }
 
 export interface Course {
+  id: string;
   title: string;
   description: string;
+  thumbnail?: string;
   modules: Module[];
 }
