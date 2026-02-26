@@ -69,6 +69,19 @@ export default function App() {
   const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({});
   const [quizSubmitted, setQuizSubmitted] = useState<Record<string, boolean>>({});
 
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+      setShowAdmin(false);
+      setSelectedCourseId(null);
+      // Force a clean state
+      window.location.href = '/';
+    } catch (error) {
+      console.error("Erro ao sair:", error);
+    }
+  };
+
   useEffect(() => {
     setCurrentModuleIndex(0);
     setCurrentLessonIndex(0);
@@ -325,7 +338,7 @@ export default function App() {
                 </button>
               )}
               <button 
-                onClick={() => signOut(auth)}
+                onClick={handleLogout}
                 className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 transition-colors flex items-center gap-2"
               >
                 <LogOut size={20} />
@@ -400,7 +413,20 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 flex font-sans text-slate-100">
-      {/* Sidebar Overlay for Mobile */}
+      {/* Mobile Overlay */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsSidebarOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 lg:hidden"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Sidebar Overlay for Mobile Toggle Button */}
       <AnimatePresence>
         {!isSidebarOpen && (
           <motion.button
@@ -539,7 +565,7 @@ export default function App() {
               </div>
             </div>
             <button 
-              onClick={() => signOut(auth)}
+              onClick={handleLogout}
               className="w-full flex items-center gap-2 px-3 py-2 text-red-400 hover:bg-red-900/20 rounded-lg text-xs font-medium transition-all"
             >
               <LogOut size={14} />

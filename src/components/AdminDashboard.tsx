@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { db, firebaseConfig, storage } from '../firebase';
+import { db, firebaseConfig, storage, auth } from '../firebase';
 import { ref, onValue, set, remove, update } from 'firebase/database';
 import { ref as sRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { initializeApp, getApps } from 'firebase/app';
@@ -22,7 +22,8 @@ import {
   Image as ImageIcon,
   GripVertical,
   FileText,
-  Upload
+  Upload,
+  LogOut
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -368,6 +369,15 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses }: Adm
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      window.location.href = '/';
+    } catch (error) {
+      console.error("Erro ao sair:", error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
       {/* Header */}
@@ -421,6 +431,15 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses }: Adm
                 {selectedCourseId ? 'Novo Módulo' : 'Novo Curso'}
               </button>
             )}
+            <div className="w-px h-8 bg-slate-800 mx-2" />
+            <button 
+              onClick={handleLogout}
+              className="p-2 hover:bg-red-900/20 rounded-lg text-red-400 transition-colors flex items-center gap-2"
+              title="Sair da Conta"
+            >
+              <LogOut size={20} />
+              <span className="hidden sm:inline text-sm font-medium">Sair</span>
+            </button>
           </div>
         </div>
       </header>
