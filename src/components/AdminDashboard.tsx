@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { db, firebaseConfig } from '../firebase';
+import { db, firebaseConfig, storage } from '../firebase';
 import { ref, onValue, set, remove, update } from 'firebase/database';
+import { ref as sRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { 
@@ -18,7 +19,10 @@ import {
   Edit2,
   Lock,
   Plus,
-  Image as ImageIcon
+  Image as ImageIcon,
+  GripVertical,
+  FileText,
+  Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -34,9 +38,10 @@ interface UserStats {
 interface AdminDashboardProps {
   onBack: () => void;
   courses: any[];
+  onUpdateCourses: (courses: any[]) => void;
 }
 
-export default function AdminDashboard({ onBack, courses }: AdminDashboardProps) {
+export default function AdminDashboard({ onBack, courses, onUpdateCourses }: AdminDashboardProps) {
   const [users, setUsers] = useState<UserStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -63,6 +68,9 @@ export default function AdminDashboard({ onBack, courses }: AdminDashboardProps)
   const [newModuleTitle, setNewModuleTitle] = useState('');
   const [showAddLesson, setShowAddLesson] = useState<string | null>(null); // moduleId
   const [newLessonTitle, setNewLessonTitle] = useState('');
+  const [newLessonContent, setNewLessonContent] = useState('');
+  const [newLessonPdfUrl, setNewLessonPdfUrl] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
 
   const selectedCourse = useMemo(() => 
     courses.find(c => c.id === selectedCourseId),
@@ -267,11 +275,15 @@ export default function AdminDashboard({ onBack, courses }: AdminDashboardProps)
   const handleAddLesson = async (moduleId: string) => {
     if (!newLessonTitle || !selectedCourseId) return;
 
-    const newLesson = {
+    const newLesson: any = {
       id: Math.random().toString(36).substring(2, 9),
       title: newLessonTitle,
-      content: '# Nova Lição\nComece a escrever aqui...'
+      content: newLessonContent || '# Nova Lição\nComece a escrever aqui...',
     };
+
+    if (newLessonPdfUrl) {
+      newLesson.pdfUrl = newLessonPdfUrl;
+    }
 
     const updatedCourses = [...courses];
     const courseIdx = updatedCourses.findIndex(c => c.id === selectedCourseId);
@@ -284,11 +296,39 @@ export default function AdminDashboard({ onBack, courses }: AdminDashboardProps)
         try {
           await set(ref(db, 'courses'), updatedCourses);
           setNewLessonTitle('');
+          setNewLessonContent('');
+          setNewLessonPdfUrl('');
           setShowAddLesson(null);
         } catch (err: any) {
           alert('Erro ao adicionar lição: ' + err.message);
         }
       }
+    }
+  };
+
+  const handleLessonFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      alert('Por favor, selecione um arquivo PDF.');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      if (!storage) {
+        throw new Error('O serviço de armazenamento (Firebase Storage) não está disponível.');
+      }
+      const fileRef = sRef(storage, `lessons/pdfs/${Date.now()}_${file.name}`);
+      await uploadBytes(fileRef, file);
+      const url = await getDownloadURL(fileRef);
+      setNewLessonPdfUrl(url);
+    } catch (error: any) {
+      console.error('Erro ao subir PDF:', error);
+      alert('Erro ao subir o PDF: ' + error.message);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -470,10 +510,10 @@ export default function AdminDashboard({ onBack, courses }: AdminDashboardProps)
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-primary-500 font-bold">
-                                  {user.email[0].toUpperCase()}
+                                  {user.email?.[0]?.toUpperCase() || '?'}
                                 </div>
                                 <div className="flex flex-col">
-                                  <span className="font-medium">{user.name || user.email.split('@')[0]}</span>
+                                  <span className="font-medium">{user.name || (user.email && user.email.includes('@') ? user.email.split('@')[0] : user.email)}</span>
                                   <span className="text-xs text-slate-500">{user.email}</span>
                                 </div>
                               </div>
@@ -560,22 +600,27 @@ export default function AdminDashboard({ onBack, courses }: AdminDashboardProps)
               <>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-2xl font-bold">Cursos Disponíveis</h2>
-                  <p className="text-slate-400 text-sm">Gerencie os cursos da plataforma.</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {courses.map((c) => (
-                    <div key={c.id} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex flex-col group">
+                    <motion.div 
+                      key={c.id} 
+                      whileHover={{ y: -5 }}
+                      className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex flex-col group cursor-default relative shadow-xl"
+                    >
                       <div className="aspect-video bg-slate-800 relative overflow-hidden">
                         {c.thumbnail ? (
-                          <img src={c.thumbnail} alt={c.title} className="w-full h-full object-cover" />
+                          <img src={c.thumbnail} alt={c.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
                             <BookOpen size={40} className="text-slate-700" />
                           </div>
                         )}
+                        
                         <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button 
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setShowEditCourseInfo(c);
                               setNewCourseTitle(c.title);
                               setNewCourseDesc(c.description);
@@ -586,7 +631,10 @@ export default function AdminDashboard({ onBack, courses }: AdminDashboardProps)
                             <Edit2 size={16} />
                           </button>
                           <button 
-                            onClick={() => handleDeleteCourse(c.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteCourse(c.id);
+                            }}
                             className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
                           >
                             <Trash2 size={16} />
@@ -604,7 +652,7 @@ export default function AdminDashboard({ onBack, courses }: AdminDashboardProps)
                           <ChevronRight size={16} />
                         </button>
                       </div>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               </>
@@ -1038,18 +1086,18 @@ export default function AdminDashboard({ onBack, courses }: AdminDashboardProps)
       {/* Add Lesson Modal */}
       <AnimatePresence>
         {showAddLesson && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-slate-900 border border-slate-800 rounded-2xl p-8 max-w-md w-full shadow-2xl"
+              className="bg-slate-900 border border-slate-800 rounded-2xl p-8 max-w-2xl w-full shadow-2xl my-8"
             >
               <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
                 <Plus className="text-primary-500" />
                 Nova Lição
               </h3>
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <div className="space-y-2">
                   <label className="text-sm text-slate-400">Título da Lição</label>
                   <input 
@@ -1058,22 +1106,65 @@ export default function AdminDashboard({ onBack, courses }: AdminDashboardProps)
                     autoFocus
                     value={newLessonTitle}
                     onChange={(e) => setNewLessonTitle(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddLesson(showAddLesson)}
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-500"
                     placeholder="Ex: Aula 01 - Conceitos Básicos"
                   />
                 </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm text-slate-400">Conteúdo (Markdown - Opcional)</label>
+                  <textarea 
+                    value={newLessonContent}
+                    onChange={(e) => setNewLessonContent(e.target.value)}
+                    className="w-full h-32 bg-slate-800 border border-slate-700 rounded-xl p-4 text-slate-100 font-mono text-sm focus:outline-none focus:border-primary-500"
+                    placeholder="# Título\nEscreva o conteúdo aqui..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm text-slate-400">Material Complementar (PDF - Opcional)</label>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex-1 relative">
+                      <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                      <input 
+                        type="text"
+                        value={newLessonPdfUrl}
+                        onChange={(e) => setNewLessonPdfUrl(e.target.value)}
+                        placeholder="URL do PDF ou faça upload"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-white text-sm focus:outline-none focus:border-primary-500"
+                      />
+                    </div>
+                    <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl px-6 py-3 flex items-center justify-center gap-2 transition-all group">
+                      {isUploading ? (
+                        <div className="w-5 h-5 border-2 border-primary-500/30 border-t-primary-500 rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <Upload size={18} className="text-slate-400 group-hover:text-primary-500" />
+                          <span className="text-sm font-bold text-slate-300">Upload</span>
+                        </>
+                      )}
+                      <input type="file" accept="application/pdf" className="hidden" onChange={handleLessonFileUpload} disabled={isUploading} />
+                    </label>
+                  </div>
+                </div>
+
                 <div className="flex gap-3 pt-4">
                   <button 
                     type="button"
-                    onClick={() => setShowAddLesson(null)}
+                    onClick={() => {
+                      setShowAddLesson(null);
+                      setNewLessonTitle('');
+                      setNewLessonContent('');
+                      setNewLessonPdfUrl('');
+                    }}
                     className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-colors"
                   >
                     Cancelar
                   </button>
                   <button 
                     onClick={() => handleAddLesson(showAddLesson)}
-                    className="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold transition-colors"
+                    disabled={isUploading}
+                    className="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold transition-colors disabled:opacity-50"
                   >
                     Criar Lição
                   </button>

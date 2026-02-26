@@ -24,7 +24,8 @@ import {
   Trash2,
   FileText,
   Upload,
-  Download
+  Download,
+  GripVertical
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
@@ -67,6 +68,14 @@ export default function App() {
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
   const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({});
   const [quizSubmitted, setQuizSubmitted] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    setCurrentModuleIndex(0);
+    setCurrentLessonIndex(0);
+    setIsEditing(false);
+    // Ensure we scroll to top when changing course
+    window.scrollTo(0, 0);
+  }, [selectedCourseId]);
 
   const isAdmin = user?.email === 'contato@adveasy.com.br';
 
@@ -117,7 +126,7 @@ export default function App() {
           if (data && data.progress && data.progress.completedLessons) {
             setCompletedLessons(data.progress.completedLessons);
           }
-        }, { onlyOnce: true });
+        });
       } else {
         setUser(null);
       }
@@ -238,13 +247,24 @@ export default function App() {
     const courseIdx = newCourses.findIndex(c => c.id === selectedCourseId);
     if (courseIdx === -1) return;
 
-    const lesson = newCourses[courseIdx].modules[currentModuleIndex].lessons[currentLessonIndex];
+    const course = newCourses[courseIdx];
+    if (!course.modules || !course.modules[currentModuleIndex]) return;
+    
+    const module = course.modules[currentModuleIndex];
+    if (!module.lessons || !module.lessons[currentLessonIndex]) return;
+
+    const lesson = module.lessons[currentLessonIndex];
     lesson.title = editTitle;
     lesson.content = editContent;
-    lesson.imageUrl = editImageUrl;
-    lesson.videoUrl = editVideoUrl;
-    lesson.pdfUrl = editPdfUrl;
-    lesson.quiz = editQuiz.length > 0 ? editQuiz : undefined;
+    
+    if (editImageUrl) lesson.imageUrl = editImageUrl; else delete lesson.imageUrl;
+    if (editVideoUrl) lesson.videoUrl = editVideoUrl; else delete lesson.videoUrl;
+    if (editPdfUrl) lesson.pdfUrl = editPdfUrl; else delete lesson.pdfUrl;
+    if (editQuiz && editQuiz.length > 0) {
+      lesson.quiz = editQuiz;
+    } else {
+      delete lesson.quiz;
+    }
     
     setCourses(newCourses);
     set(ref(db, 'courses'), newCourses);
@@ -271,7 +291,16 @@ export default function App() {
   }
 
   if (showAdmin && isAdmin) {
-    return <AdminDashboard onBack={() => setShowAdmin(false)} courses={courses} />;
+    return (
+      <AdminDashboard 
+        onBack={() => setShowAdmin(false)} 
+        courses={courses} 
+        onUpdateCourses={(newCourses) => {
+          setCourses(newCourses);
+          set(ref(db, 'courses'), newCourses);
+        }}
+      />
+    );
   }
 
   if (!selectedCourseId) {
@@ -309,50 +338,60 @@ export default function App() {
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="mb-12">
             <h1 className="text-4xl font-extrabold mb-4">Seus Cursos</h1>
-            <p className="text-slate-400 text-lg">Continue sua jornada de aprendizado e domine a advocacia moderna.</p>
+            <p className="text-slate-400 text-lg">
+              Continue sua jornada de aprendizado e domine a advocacia moderna.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {courses.map((c) => (
-              <motion.div
-                key={c.id}
-                whileHover={{ y: -5 }}
-                className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden flex flex-col shadow-xl"
-              >
-                <div className="aspect-video relative overflow-hidden bg-slate-800">
-                  {c.thumbnail ? (
-                    <img 
-                      src={c.thumbnail} 
-                      alt={c.title} 
-                      className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <BookOpen size={48} className="text-slate-700" />
+            {courses.length > 0 ? (
+              courses.map((c) => (
+                <motion.div
+                  key={c.id}
+                  whileHover={{ y: -5 }}
+                  className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden flex flex-col shadow-xl cursor-default relative group"
+                >
+                  <div className="aspect-video relative overflow-hidden bg-slate-800">
+                    {c.thumbnail ? (
+                      <img 
+                        src={c.thumbnail} 
+                        alt={c.title} 
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <BookOpen size={48} className="text-slate-700" />
+                      </div>
+                    )}
+                    <div className="absolute top-4 left-4">
+                      <span className="px-3 py-1 bg-primary-500 text-white text-xs font-bold rounded-full uppercase tracking-wider">
+                        Curso
+                      </span>
                     </div>
-                  )}
-                  <div className="absolute top-4 left-4">
-                    <span className="px-3 py-1 bg-primary-500 text-white text-xs font-bold rounded-full uppercase tracking-wider">
-                      Curso
-                    </span>
                   </div>
-                </div>
-                <div className="p-6 flex-1 flex flex-col">
-                  <h3 className="text-xl font-bold mb-3 line-clamp-2">{c.title}</h3>
-                  <p className="text-slate-400 text-sm mb-6 line-clamp-3 flex-1">
-                    {c.description}
-                  </p>
-                  <button
-                    onClick={() => setSelectedCourseId(c.id)}
-                    className="w-full py-3 bg-slate-800 hover:bg-primary-600 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 group"
-                  >
-                    Acessar Curso
-                    <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                  </button>
-                </div>
-              </motion.div>
-            ))}
+                  <div className="p-6 flex-1 flex flex-col">
+                    <h3 className="text-xl font-bold mb-3 line-clamp-2">{c.title}</h3>
+                    <p className="text-slate-400 text-sm mb-6 line-clamp-3 flex-1">
+                      {c.description}
+                    </p>
+                    <button
+                      onClick={() => setSelectedCourseId(c.id)}
+                      className="w-full py-3 bg-slate-800 hover:bg-primary-600 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 group/btn"
+                    >
+                      Acessar Curso
+                      <ArrowRight size={18} className="group-hover/btn:translate-x-1 transition-transform" />
+                    </button>
+                  </div>
+                </motion.div>
+              ))
+            ) : (
+              <div className="col-span-full text-center py-20 bg-slate-900/50 border border-dashed border-slate-800 rounded-3xl">
+                <BookOpen size={48} className="mx-auto text-slate-700 mb-4" />
+                <h3 className="text-xl font-bold text-slate-300">Nenhum curso disponível</h3>
+                <p className="text-slate-500">Aguarde a liberação de novos conteúdos.</p>
+              </div>
+            )}
           </div>
         </main>
       </div>
@@ -752,11 +791,11 @@ export default function App() {
                 </div>
               ) : (
                 <>
-                  {currentLesson.videoUrl && (
+                  {currentLesson.videoUrl && typeof currentLesson.videoUrl === 'string' && (
                     <div className="mb-8 aspect-video rounded-2xl overflow-hidden border border-slate-800 bg-black">
                       {currentLesson.videoUrl.includes('youtube.com') || currentLesson.videoUrl.includes('youtu.be') ? (
                         <iframe
-                          src={`https://www.youtube.com/embed/${currentLesson.videoUrl.split('v=')[1]?.split('&')[0] || currentLesson.videoUrl.split('/').pop()}`}
+                          src={`https://www.youtube.com/embed/${currentLesson.videoUrl.includes('v=') ? currentLesson.videoUrl.split('v=')[1]?.split('&')[0] : currentLesson.videoUrl.split('/').pop()}`}
                           className="w-full h-full"
                           allowFullScreen
                         />
@@ -976,7 +1015,7 @@ export default function App() {
       <AnimatePresence>
         {showCertificate && (
           <Certificate 
-            userName={userName || user?.email?.split('@')[0] || 'Aluno'} 
+            userName={userName || 'Aluno'} 
             courseTitle={selectedCourse.title}
             onClose={() => setShowCertificate(false)}
           />
