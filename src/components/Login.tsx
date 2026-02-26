@@ -29,7 +29,11 @@ export default function Login({ onSuccess }: LoginProps) {
       onSuccess();
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Erro ao autenticar');
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+        setError('E-mail ou senha incorretos ou sem cadastro');
+      } else {
+        setError(err.message || 'Erro ao autenticar');
+      }
     } finally {
       setLoading(false);
     }
