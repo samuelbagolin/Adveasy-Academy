@@ -444,7 +444,7 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses }: Adm
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-32">
         {activeTab === 'users' ? (
           <>
             {/* Stats Grid */}
@@ -483,7 +483,7 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses }: Adm
             </div>
 
             {/* User List */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl">
               <div className="p-6 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <h2 className="text-lg font-bold">Lista de Alunos</h2>
                 <div className="relative">
@@ -498,7 +498,7 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses }: Adm
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto pb-32">
                 <table className="w-full text-left">
                   <thead>
                     <tr className="bg-slate-800/50 text-slate-400 text-xs uppercase tracking-wider">
