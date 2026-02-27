@@ -243,13 +243,24 @@ export default function App() {
       if (!storage) {
         throw new Error('O serviço de armazenamento (Firebase Storage) não está disponível. Verifique se ele está ativado no console do Firebase.');
       }
-      const fileRef = sRef(storage, `lessons/pdfs/${Date.now()}_${file.name}`);
+      
+      // Limitar tamanho do arquivo para 20MB para evitar travamentos
+      if (file.size > 20 * 1024 * 1024) {
+        throw new Error('O arquivo é muito grande. O limite é 20MB.');
+      }
+
+      const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      const fileRef = sRef(storage, `lessons/pdfs/${fileName}`);
+      
+      console.log('Iniciando upload para:', fileRef.fullPath);
       await uploadBytes(fileRef, file);
+      
+      console.log('Upload concluído, obtendo URL...');
       const url = await getDownloadURL(fileRef);
       setEditPdfUrl(url);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao subir PDF:', error);
-      alert('Erro ao subir o PDF. Tente novamente.');
+      alert('Erro ao subir o PDF: ' + (error.message || 'Erro desconhecido. Tente novamente.'));
     } finally {
       setIsUploading(false);
     }
