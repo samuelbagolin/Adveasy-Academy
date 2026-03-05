@@ -194,7 +194,6 @@ O funil de vendas é um modelo estratégico que mapeia a jornada do cliente, des
           title: "2.2. Métricas Essenciais",
           content: `
 ## 2.1. Métricas Essenciais para o Funil Jurídico
-
 Para otimizar seu funil, é crucial monitorar as métricas corretas:
 
 *   **Taxa de Conversão por Etapa:** Quantos leads avançam de uma etapa para a próxima?
@@ -402,5 +401,49 @@ Implemente os princípios do Método Adveasy e prepare-se para uma prática jur�
       ]
     }
   ]
- }
+  },
+  {
+    id: "c2",
+    title: "Contrato Fechado: A Arte de Converter Leads na Advocacia",
+    description: "Domine as técnicas de conversão e fechamento de contratos para transformar leads em clientes fiéis.",
+    thumbnail: "https://picsum.photos/seed/contrato/800/450",
+    modules: [
+      {
+        id: "m2-1",
+        title: "Módulo 1: O Processo de Conversão",
+        lessons: [
+          {
+            id: "l2-1-1",
+            title: "Aula 1: Abertura",
+            content: "Nesta aula inaugural, exploramos os fundamentos da conversão de leads na advocacia e como preparar sua mentalidade para o fechamento.",
+            videoUrl: "https://player.vimeo.com/video/1170713132?title=0&byline=0&portrait=0&badge=0&autopause=0&player_id=0&app_id=58479"
+          },
+          {
+            id: "l2-1-2",
+            title: "Aula 2: Qualificação Estratégica",
+            content: "Aprenda a identificar os leads com maior potencial e como conduzir a primeira conversa para gerar autoridade imediata.",
+            videoUrl: "https://player.vimeo.com/video/1170713030?title=0&byline=0&portrait=0&badge=0&autopause=0&player_id=0&app_id=58479"
+          },
+          {
+            id: "l2-1-3",
+            title: "Aula 3: Apresentação de Valor",
+            content: "Como estruturar sua proposta de forma que o preço se torne irrelevante diante do valor percebido pelo cliente.",
+            videoUrl: "https://player.vimeo.com/video/1170712909?title=0&byline=0&portrait=0&badge=0&autopause=0&player_id=0&app_id=58479"
+          },
+          {
+            id: "l2-1-4",
+            title: "Aula 4: Quebra de Objeções",
+            content: "Técnicas avançadas para lidar com as hesitações mais comuns dos clientes e transformar o 'vou pensar' em 'onde assino?'.",
+            videoUrl: "https://player.vimeo.com/video/1170712799?title=0&byline=0&portrait=0&badge=0&autopause=0&player_id=0&app_id=58479"
+          },
+          {
+            id: "l2-1-5",
+            title: "Aula 5: O Fechamento Perfeito",
+            content: "O passo a passo final para garantir a assinatura do contrato e iniciar um relacionamento de sucesso com seu novo cliente.",
+            videoUrl: "https://player.vimeo.com/video/1170712713?title=0&byline=0&portrait=0&badge=0&autopause=0&player_id=0&app_id=58479"
+          }
+        ]
+      }
+    ]
+  }
 ];

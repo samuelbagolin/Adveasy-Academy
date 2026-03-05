@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db, firebaseConfig, storage, auth } from '../firebase';
+import { courseData } from '../courseData';
 import { ref, onValue, set, remove, update } from 'firebase/database';
 import { ref as sRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { initializeApp, getApps } from 'firebase/app';
@@ -19,11 +20,13 @@ import {
   Edit2,
   Lock,
   Plus,
+  Video,
   Image as ImageIcon,
   GripVertical,
   FileText,
   Upload,
-  LogOut
+  LogOut,
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -71,6 +74,7 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses }: Adm
   const [newLessonTitle, setNewLessonTitle] = useState('');
   const [newLessonContent, setNewLessonContent] = useState('');
   const [newLessonPdfUrl, setNewLessonPdfUrl] = useState('');
+  const [newLessonVideoUrl, setNewLessonVideoUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
 
   const selectedCourse = useMemo(() => 
@@ -286,6 +290,10 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses }: Adm
       newLesson.pdfUrl = newLessonPdfUrl;
     }
 
+    if (newLessonVideoUrl) {
+      newLesson.videoUrl = newLessonVideoUrl;
+    }
+
     const updatedCourses = [...courses];
     const courseIdx = updatedCourses.findIndex(c => c.id === selectedCourseId);
     if (courseIdx !== -1) {
@@ -299,6 +307,7 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses }: Adm
           setNewLessonTitle('');
           setNewLessonContent('');
           setNewLessonPdfUrl('');
+          setNewLessonVideoUrl('');
           setShowAddLesson(null);
         } catch (err: any) {
           alert('Erro ao adicionar lição: ' + err.message);
@@ -339,6 +348,45 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses }: Adm
     } catch (error: any) {
       console.error('Erro ao subir PDF:', error);
       alert('Erro ao subir o PDF: ' + (error.message || 'Erro desconhecido.'));
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleLessonVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Aceitar formatos de vídeo comuns, incluindo MOV
+    const allowedTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
+    if (!allowedTypes.includes(file.type) && !file.name.toLowerCase().endsWith('.mov')) {
+      alert('Por favor, selecione um arquivo de vídeo válido (MP4, MOV, etc).');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      if (!storage) {
+        throw new Error('O serviço de armazenamento (Firebase Storage) não está disponível.');
+      }
+
+      // Limitar tamanho do arquivo para 100MB para vídeos
+      if (file.size > 100 * 1024 * 1024) {
+        throw new Error('O arquivo de vídeo é muito grande. O limite é 100MB.');
+      }
+
+      const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      const fileRef = sRef(storage, `lessons/videos/${fileName}`);
+      
+      console.log('Iniciando upload de vídeo para:', fileRef.fullPath);
+      await uploadBytes(fileRef, file);
+      
+      console.log('Upload de vídeo concluído, obtendo URL...');
+      const url = await getDownloadURL(fileRef);
+      setNewLessonVideoUrl(url);
+    } catch (error: any) {
+      console.error('Erro ao subir vídeo:', error);
+      alert('Erro ao subir o vídeo: ' + (error.message || 'Erro desconhecido.'));
     } finally {
       setIsUploading(false);
     }
@@ -389,6 +437,20 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses }: Adm
     }
   };
 
+  const handleSyncCourses = async () => {
+    if (!confirm('Isso irá atualizar todos os cursos para a versão padrão definida no código. Alterações manuais feitas no painel podem ser perdidas. Deseja continuar?')) return;
+    
+    setActionLoading(true);
+    try {
+      await set(ref(db, 'courses'), courseData);
+      alert('Cursos sincronizados com sucesso!');
+    } catch (err: any) {
+      alert('Erro ao sincronizar cursos: ' + err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
       {/* Header */}
@@ -434,13 +496,26 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses }: Adm
               </button>
             )}
             {activeTab === 'course' && (
-              <button 
-                onClick={() => selectedCourseId ? setShowAddModule(true) : setShowAddCourse(true)}
-                className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-all"
-              >
-                <Plus size={18} />
-                {selectedCourseId ? 'Novo Módulo' : 'Novo Curso'}
-              </button>
+              <div className="flex items-center gap-2">
+                {!selectedCourseId && (
+                  <button 
+                    onClick={handleSyncCourses}
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-all"
+                    title="Sincronizar com dados padrão"
+                    disabled={actionLoading}
+                  >
+                    <RefreshCw size={18} className={actionLoading ? "animate-spin" : ""} />
+                    <span className="hidden sm:inline">Sincronizar</span>
+                  </button>
+                )}
+                <button 
+                  onClick={() => selectedCourseId ? setShowAddModule(true) : setShowAddCourse(true)}
+                  className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-all"
+                >
+                  <Plus size={18} />
+                  {selectedCourseId ? 'Novo Módulo' : 'Novo Curso'}
+                </button>
+              </div>
             )}
             <div className="w-px h-8 bg-slate-800 mx-2" />
             <button 
@@ -1152,6 +1227,33 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses }: Adm
                 </div>
 
                 <div className="space-y-2">
+                  <label className="text-sm text-slate-400">Vídeo da Aula (Upload ou URL - Opcional)</label>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex-1 relative">
+                      <Video className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                      <input 
+                        type="text"
+                        value={newLessonVideoUrl}
+                        onChange={(e) => setNewLessonVideoUrl(e.target.value)}
+                        placeholder="URL do vídeo ou faça upload"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-white text-sm focus:outline-none focus:border-primary-500"
+                      />
+                    </div>
+                    <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl px-6 py-3 flex items-center justify-center gap-2 transition-all group">
+                      {isUploading ? (
+                        <div className="w-5 h-5 border-2 border-primary-500/30 border-t-primary-500 rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <Upload size={18} className="text-slate-400 group-hover:text-primary-500" />
+                          <span className="text-sm font-bold text-slate-300">Upload Vídeo</span>
+                        </>
+                      )}
+                      <input type="file" accept="video/*,.mov" className="hidden" onChange={handleLessonVideoUpload} disabled={isUploading} />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
                   <label className="text-sm text-slate-400">Material Complementar (PDF - Opcional)</label>
                   <div className="flex flex-col sm:flex-row gap-4">
                     <div className="flex-1 relative">
@@ -1186,6 +1288,7 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses }: Adm
                       setNewLessonTitle('');
                       setNewLessonContent('');
                       setNewLessonPdfUrl('');
+                      setNewLessonVideoUrl('');
                     }}
                     className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-colors"
                   >

@@ -13,6 +13,7 @@ import {
   X, 
   PlayCircle,
   Award,
+  Video,
   ArrowRight,
   GraduationCap,
   LogOut,
@@ -261,6 +262,44 @@ export default function App() {
     } catch (error: any) {
       console.error('Erro ao subir PDF:', error);
       alert('Erro ao subir o PDF: ' + (error.message || 'Erro desconhecido. Tente novamente.'));
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleVideoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
+    if (!allowedTypes.includes(file.type) && !file.name.toLowerCase().endsWith('.mov')) {
+      alert('Por favor, selecione um arquivo de vídeo válido (MP4, MOV, etc).');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      if (!storage) {
+        throw new Error('O serviço de armazenamento (Firebase Storage) não está disponível.');
+      }
+      
+      // Limite de 100MB para vídeos
+      if (file.size > 100 * 1024 * 1024) {
+        throw new Error('O arquivo de vídeo é muito grande. O limite é 100MB.');
+      }
+
+      const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      const fileRef = sRef(storage, `lessons/videos/${fileName}`);
+      
+      console.log('Iniciando upload de vídeo para:', fileRef.fullPath);
+      await uploadBytes(fileRef, file);
+      
+      console.log('Upload de vídeo concluído, obtendo URL...');
+      const url = await getDownloadURL(fileRef);
+      setEditVideoUrl(url);
+    } catch (error: any) {
+      console.error('Erro ao subir vídeo:', error);
+      alert('Erro ao subir o vídeo: ' + (error.message || 'Erro desconhecido. Tente novamente.'));
     } finally {
       setIsUploading(false);
     }
@@ -689,14 +728,34 @@ export default function App() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-400">URL do Vídeo (YouTube/Vimeo - opcional)</label>
-                      <input 
-                        type="text"
-                        value={editVideoUrl}
-                        onChange={(e) => setEditVideoUrl(e.target.value)}
-                        placeholder="https://youtube.com/watch?v=..."
-                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-100 text-sm focus:outline-none focus:border-primary-500"
-                      />
+                      <label className="text-sm font-medium text-slate-400">Vídeo da Aula (Upload ou URL - opcional)</label>
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1 relative">
+                          <Video className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                          <input 
+                            type="text"
+                            value={editVideoUrl}
+                            onChange={(e) => setEditVideoUrl(e.target.value)}
+                            placeholder="URL do vídeo ou suba um arquivo"
+                            className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-10 pr-4 py-2 text-slate-100 text-sm focus:outline-none focus:border-primary-500"
+                          />
+                        </div>
+                        <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shrink-0">
+                          {isUploading ? (
+                            <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Upload size={18} />
+                          )}
+                          {isUploading ? 'Subindo...' : 'Subir Vídeo'}
+                          <input 
+                            type="file" 
+                            accept="video/*,.mov" 
+                            className="hidden" 
+                            onChange={handleVideoFileUpload}
+                            disabled={isUploading}
+                          />
+                        </label>
+                      </div>
                     </div>
                   </div>
 
@@ -835,6 +894,13 @@ export default function App() {
                           src={`https://www.youtube.com/embed/${currentLesson.videoUrl.includes('v=') ? currentLesson.videoUrl.split('v=')[1]?.split('&')[0] : currentLesson.videoUrl.split('/').pop()}`}
                           className="w-full h-full"
                           allowFullScreen
+                        />
+                      ) : currentLesson.videoUrl.includes('vimeo.com') ? (
+                        <iframe
+                          src={currentLesson.videoUrl.includes('player.vimeo.com') ? currentLesson.videoUrl : `https://player.vimeo.com/video/${currentLesson.videoUrl.split('/').pop()}`}
+                          className="w-full h-full"
+                          allowFullScreen
+                          allow="autoplay; fullscreen; picture-in-picture"
                         />
                       ) : (
                         <video src={currentLesson.videoUrl} controls className="w-full h-full" />
