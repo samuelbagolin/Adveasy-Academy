@@ -71,6 +71,10 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses }: Adm
   const [showAddModule, setShowAddModule] = useState(false);
   const [newModuleTitle, setNewModuleTitle] = useState('');
   const [showAddLesson, setShowAddLesson] = useState<string | null>(null); // moduleId
+  const [showEditModule, setShowEditModule] = useState<string | null>(null); // moduleId
+  const [editModuleTitle, setEditModuleTitle] = useState('');
+  const [showEditLesson, setShowEditLesson] = useState<{moduleId: string, lessonId: string} | null>(null);
+  const [editLessonTitle, setEditLessonTitle] = useState('');
   const [newLessonTitle, setNewLessonTitle] = useState('');
   const [newLessonContent, setNewLessonContent] = useState('');
   const [newLessonPdfUrl, setNewLessonPdfUrl] = useState('');
@@ -404,6 +408,47 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses }: Adm
         await set(ref(db, 'courses'), updatedCourses);
       } catch (err: any) {
         alert('Erro ao excluir módulo: ' + err.message);
+      }
+    }
+  };
+
+  const handleUpdateModule = async (moduleId: string) => {
+    if (!editModuleTitle.trim()) return;
+    
+    const updatedCourses = [...courses];
+    const courseIdx = updatedCourses.findIndex(c => c.id === selectedCourseId);
+    if (courseIdx !== -1) {
+      const moduleIdx = updatedCourses[courseIdx].modules.findIndex((m: any) => m.id === moduleId);
+      if (moduleIdx !== -1) {
+        updatedCourses[courseIdx].modules[moduleIdx].title = editModuleTitle;
+        try {
+          await set(ref(db, 'courses'), updatedCourses);
+          setShowEditModule(null);
+        } catch (err: any) {
+          alert('Erro ao atualizar módulo: ' + err.message);
+        }
+      }
+    }
+  };
+
+  const handleUpdateLesson = async (moduleId: string, lessonId: string) => {
+    if (!editLessonTitle.trim()) return;
+
+    const updatedCourses = [...courses];
+    const courseIdx = updatedCourses.findIndex(c => c.id === selectedCourseId);
+    if (courseIdx !== -1) {
+      const moduleIdx = updatedCourses[courseIdx].modules.findIndex((m: any) => m.id === moduleId);
+      if (moduleIdx !== -1) {
+        const lessonIdx = updatedCourses[courseIdx].modules[moduleIdx].lessons.findIndex((l: any) => l.id === lessonId);
+        if (lessonIdx !== -1) {
+          updatedCourses[courseIdx].modules[moduleIdx].lessons[lessonIdx].title = editLessonTitle;
+          try {
+            await set(ref(db, 'courses'), updatedCourses);
+            setShowEditLesson(null);
+          } catch (err: any) {
+            alert('Erro ao atualizar lição: ' + err.message);
+          }
+        }
       }
     }
   };
@@ -787,7 +832,47 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses }: Adm
                             <div className="w-10 h-10 rounded-xl bg-primary-500/10 text-primary-500 flex items-center justify-center font-bold">
                               {(selectedCourse?.modules || []).indexOf(module) + 1}
                             </div>
-                            <h3 className="text-lg font-bold">{module.title}</h3>
+                            {showEditModule === module.id ? (
+                              <div className="flex items-center gap-2">
+                                <input 
+                                  type="text"
+                                  value={editModuleTitle}
+                                  onChange={(e) => setEditModuleTitle(e.target.value)}
+                                  className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1 text-white focus:outline-none focus:border-primary-500"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleUpdateModule(module.id);
+                                    if (e.key === 'Escape') setShowEditModule(null);
+                                  }}
+                                />
+                                <button 
+                                  onClick={() => handleUpdateModule(module.id)}
+                                  className="p-1.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
+                                >
+                                  <Plus size={16} />
+                                </button>
+                                <button 
+                                  onClick={() => setShowEditModule(null)}
+                                  className="p-1.5 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors"
+                                >
+                                  <ArrowLeft size={16} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-lg font-bold">{module.title}</h3>
+                                <button 
+                                  onClick={() => {
+                                    setShowEditModule(module.id);
+                                    setEditModuleTitle(module.title);
+                                  }}
+                                  className="p-1.5 text-slate-500 hover:text-primary-400 hover:bg-slate-700 rounded-lg transition-all"
+                                  title="Editar nome do módulo"
+                                >
+                                  <Edit2 size={16} />
+                                </button>
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center gap-2">
                             <button 
@@ -809,9 +894,48 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses }: Adm
                           <div className="grid gap-2">
                             {(module.lessons || []).map((lesson: any) => (
                               <div key={lesson.id} className="flex items-center justify-between p-4 bg-slate-800/30 rounded-xl border border-slate-800 hover:border-slate-700 transition-all group">
-                                <div className="flex items-center gap-3">
-                                  <BookOpen size={16} className="text-slate-500" />
-                                  <span className="font-medium">{lesson.title}</span>
+                                <div className="flex items-center gap-3 flex-1">
+                                  <BookOpen size={16} className="text-slate-500 shrink-0" />
+                                  {showEditLesson?.lessonId === lesson.id ? (
+                                    <div className="flex items-center gap-2 flex-1">
+                                      <input 
+                                        type="text"
+                                        value={editLessonTitle}
+                                        onChange={(e) => setEditLessonTitle(e.target.value)}
+                                        className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1 text-white text-sm focus:outline-none focus:border-primary-500 flex-1"
+                                        autoFocus
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') handleUpdateLesson(module.id, lesson.id);
+                                          if (e.key === 'Escape') setShowEditLesson(null);
+                                        }}
+                                      />
+                                      <button 
+                                        onClick={() => handleUpdateLesson(module.id, lesson.id)}
+                                        className="p-1.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
+                                      >
+                                        <Plus size={14} />
+                                      </button>
+                                      <button 
+                                        onClick={() => setShowEditLesson(null)}
+                                        className="p-1.5 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors"
+                                      >
+                                        <ArrowLeft size={14} />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-2 group/title">
+                                      <span className="font-medium">{lesson.title}</span>
+                                      <button 
+                                        onClick={() => {
+                                          setShowEditLesson({ moduleId: module.id, lessonId: lesson.id });
+                                          setEditLessonTitle(lesson.title);
+                                        }}
+                                        className="p-1 opacity-0 group-hover/title:opacity-100 text-slate-500 hover:text-primary-400 transition-all"
+                                      >
+                                        <Edit2 size={14} />
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                                 <button 
                                   onClick={() => handleDeleteLesson(module.id, lesson.id)}
