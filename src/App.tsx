@@ -389,124 +389,119 @@ export default function App() {
     return <Login onSuccess={() => {}} />;
   }
 
-  if (showAdmin && isAdmin) {
-    return (
-      <AdminDashboard 
-        onBack={() => setShowAdmin(false)} 
-        courses={courses} 
-        onUpdateCourses={(newCourses) => {
-          setCourses(newCourses);
-          set(ref(db, 'courses'), newCourses);
-        }}
-      />
-    );
-  }
-
-  if (!selectedCourseId) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
-        <header className="bg-slate-900/50 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary-500 rounded-xl">
-                <GraduationCap size={24} className="text-white" />
+  return (
+    <>
+      {showAdmin && isAdmin ? (
+        <AdminDashboard 
+          onBack={() => setShowAdmin(false)} 
+          courses={courses} 
+          onUpdateCourses={(newCourses) => {
+            setCourses(newCourses);
+            set(ref(db, 'courses'), newCourses);
+          }}
+          onChangePassword={() => setShowChangePassword(true)}
+        />
+      ) : !selectedCourseId ? (
+        <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
+          <header className="bg-slate-900/50 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary-500 rounded-xl">
+                  <GraduationCap size={24} className="text-white" />
+                </div>
+                <span className="text-xl font-bold tracking-tight">Adveasy Academy</span>
               </div>
-              <span className="text-xl font-bold tracking-tight">Adveasy Academy</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setShowChangePassword(true)}
-                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 transition-colors flex items-center gap-2"
-                title="Alterar Senha"
-              >
-                <Lock size={20} />
-                <span className="hidden sm:inline">Senha</span>
-              </button>
-              {isAdmin && (
+              <div className="flex items-center gap-4">
                 <button 
-                  onClick={() => setShowAdmin(true)}
+                  onClick={() => setShowChangePassword(true)}
+                  className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 transition-colors flex items-center gap-2"
+                  title="Alterar Senha"
+                >
+                  <Lock size={20} />
+                  <span className="hidden sm:inline">Senha</span>
+                </button>
+                {isAdmin && (
+                  <button 
+                    onClick={() => setShowAdmin(true)}
+                    className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 transition-colors flex items-center gap-2"
+                  >
+                    <LayoutDashboard size={20} />
+                    <span className="hidden sm:inline">Painel</span>
+                  </button>
+                )}
+                <button 
+                  onClick={handleLogout}
                   className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 transition-colors flex items-center gap-2"
                 >
-                  <LayoutDashboard size={20} />
-                  <span className="hidden sm:inline">Painel</span>
+                  <LogOut size={20} />
+                  <span className="hidden sm:inline">Sair</span>
                 </button>
-              )}
-              <button 
-                onClick={handleLogout}
-                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 transition-colors flex items-center gap-2"
-              >
-                <LogOut size={20} />
-                <span className="hidden sm:inline">Sair</span>
-              </button>
-            </div>
-          </div>
-        </header>
-
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="mb-12">
-            <h1 className="text-4xl font-extrabold mb-4">Seus Cursos</h1>
-            <p className="text-slate-400 text-lg">
-              Continue sua jornada de aprendizado e domine a advocacia moderna.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {courses.length > 0 ? (
-              courses.map((c) => (
-                <motion.div
-                  key={c.id}
-                  whileHover={{ y: -5 }}
-                  className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden flex flex-col shadow-xl cursor-default relative group"
-                >
-                  <div className="aspect-video relative overflow-hidden bg-slate-800">
-                    {c.thumbnail ? (
-                      <img 
-                        src={c.thumbnail} 
-                        alt={c.title} 
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <BookOpen size={48} className="text-slate-700" />
-                      </div>
-                    )}
-                    <div className="absolute top-4 left-4">
-                      <span className="px-3 py-1 bg-primary-500 text-white text-xs font-bold rounded-full uppercase tracking-wider">
-                        Curso
-                      </span>
-                    </div>
-                  </div>
-                  <div className="p-6 flex-1 flex flex-col">
-                    <h3 className="text-xl font-bold mb-3 line-clamp-2">{c.title}</h3>
-                    <p className="text-slate-400 text-sm mb-6 line-clamp-3 flex-1">
-                      {c.description}
-                    </p>
-                    <button
-                      onClick={() => setSelectedCourseId(c.id)}
-                      className="w-full py-3 bg-slate-800 hover:bg-primary-600 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 group/btn"
-                    >
-                      Acessar Curso
-                      <ArrowRight size={18} className="group-hover/btn:translate-x-1 transition-transform" />
-                    </button>
-                  </div>
-                </motion.div>
-              ))
-            ) : (
-              <div className="col-span-full text-center py-20 bg-slate-900/50 border border-dashed border-slate-800 rounded-3xl">
-                <BookOpen size={48} className="mx-auto text-slate-700 mb-4" />
-                <h3 className="text-xl font-bold text-slate-300">Nenhum curso disponível</h3>
-                <p className="text-slate-500">Aguarde a liberação de novos conteúdos.</p>
               </div>
-            )}
-          </div>
-        </main>
-      </div>
-    );
-  }
+            </div>
+          </header>
 
-  return (
-    <div className="min-h-screen bg-slate-950 flex font-sans text-slate-100">
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div className="mb-12">
+              <h1 className="text-4xl font-extrabold mb-4">Seus Cursos</h1>
+              <p className="text-slate-400 text-lg">
+                Continue sua jornada de aprendizado e domine a advocacia moderna.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {courses.length > 0 ? (
+                courses.map((c) => (
+                  <motion.div
+                    key={c.id}
+                    whileHover={{ y: -5 }}
+                    className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden flex flex-col shadow-xl cursor-default relative group"
+                  >
+                    <div className="aspect-video relative overflow-hidden bg-slate-800">
+                      {c.thumbnail ? (
+                        <img 
+                          src={c.thumbnail} 
+                          alt={c.title} 
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <BookOpen size={48} className="text-slate-700" />
+                        </div>
+                      )}
+                      <div className="absolute top-4 left-4">
+                        <span className="px-3 py-1 bg-primary-500 text-white text-xs font-bold rounded-full uppercase tracking-wider">
+                          Curso
+                        </span>
+                      </div>
+                    </div>
+                    <div className="p-6 flex-1 flex flex-col">
+                      <h3 className="text-xl font-bold mb-3 line-clamp-2">{c.title}</h3>
+                      <p className="text-slate-400 text-sm mb-6 line-clamp-3 flex-1">
+                        {c.description}
+                      </p>
+                      <button
+                        onClick={() => setSelectedCourseId(c.id)}
+                        className="w-full py-3 bg-slate-800 hover:bg-primary-600 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 group/btn"
+                      >
+                        Acessar Curso
+                        <ArrowRight size={18} className="group-hover/btn:translate-x-1 transition-transform" />
+                      </button>
+                    </div>
+                  </motion.div>
+                ))
+              ) : (
+                <div className="col-span-full text-center py-20 bg-slate-900/50 border border-dashed border-slate-800 rounded-3xl">
+                  <BookOpen size={48} className="mx-auto text-slate-700 mb-4" />
+                  <h3 className="text-xl font-bold text-slate-300">Nenhum curso disponível</h3>
+                  <p className="text-slate-500">Aguarde a liberação de novos conteúdos.</p>
+                </div>
+              )}
+            </div>
+          </main>
+        </div>
+      ) : (
+        <div className="min-h-screen bg-slate-950 flex font-sans text-slate-100">
       {/* Mobile Overlay */}
       <AnimatePresence>
         {isSidebarOpen && (
@@ -1165,6 +1160,8 @@ export default function App() {
           </div>
         </div>
       </main>
+    </div>
+  )}
 
       <AnimatePresence>
         {showCertificate && (
@@ -1251,6 +1248,6 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
-    </div>
+    </>
   );
 }

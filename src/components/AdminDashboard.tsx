@@ -43,9 +43,10 @@ interface AdminDashboardProps {
   onBack: () => void;
   courses: any[];
   onUpdateCourses: (courses: any[]) => void;
+  onChangePassword: () => void;
 }
 
-export default function AdminDashboard({ onBack, courses, onUpdateCourses }: AdminDashboardProps) {
+export default function AdminDashboard({ onBack, courses, onUpdateCourses, onChangePassword }: AdminDashboardProps) {
   const [users, setUsers] = useState<UserStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -563,6 +564,14 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses }: Adm
               </div>
             )}
             <div className="w-px h-8 bg-slate-800 mx-2" />
+            <button 
+              onClick={onChangePassword}
+              className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 transition-colors flex items-center gap-2"
+              title="Alterar Minha Senha"
+            >
+              <Lock size={20} />
+              <span className="hidden sm:inline text-sm font-medium">Senha</span>
+            </button>
             <button 
               onClick={handleLogout}
               className="p-2 hover:bg-red-900/20 rounded-lg text-red-400 transition-colors flex items-center gap-2"
