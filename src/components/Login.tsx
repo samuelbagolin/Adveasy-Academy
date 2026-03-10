@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { auth } from '../firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { GraduationCap, LogIn, UserPlus, AlertCircle } from 'lucide-react';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { GraduationCap, LogIn, UserPlus, AlertCircle, KeyRound } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface LoginProps {
@@ -14,6 +14,7 @@ export default function Login({ onSuccess }: LoginProps) {
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +40,25 @@ export default function Login({ onSuccess }: LoginProps) {
     }
   };
 
+  const handleResetPassword = async () => {
+    if (!email) {
+      setError('Por favor, digite seu e-mail primeiro para recuperar a senha.');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setResetSent(true);
+      setError('');
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Erro ao enviar e-mail de recuperação');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
       <motion.div 
@@ -56,58 +76,102 @@ export default function Login({ onSuccess }: LoginProps) {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {error && (
-            <div className="p-4 bg-red-900/20 border border-red-800 rounded-xl flex items-center gap-3 text-red-400 text-sm">
-              <AlertCircle size={18} />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-400">E-mail</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-500 transition-colors"
-              placeholder="seu@email.com"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-400">Senha</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-500 transition-colors"
-              placeholder="••••••••"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-4 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+        {resetSent ? (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center space-y-6"
           >
-            {loading ? (
-              <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : isRegistering ? (
-              <>
-                <UserPlus size={20} />
-                Criar Conta
-              </>
-            ) : (
-              <>
-                <LogIn size={20} />
-                Entrar
-              </>
+            <div className="p-4 bg-emerald-900/20 border border-emerald-800 rounded-xl flex items-center gap-3 text-emerald-400 text-sm">
+              <KeyRound size={18} />
+              <span>E-mail de recuperação enviado para {email}! Verifique sua caixa de entrada.</span>
+            </div>
+            <button
+              onClick={() => setResetSent(false)}
+              className="text-primary-500 hover:text-primary-400 font-medium transition-colors"
+            >
+              Voltar para o login
+            </button>
+          </motion.div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="p-4 bg-red-900/20 border border-red-800 rounded-xl flex items-center gap-3 text-red-400 text-sm">
+                <AlertCircle size={18} />
+                <span>{error}</span>
+              </div>
             )}
-          </button>
-        </form>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-400">E-mail</label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-500 transition-colors"
+                placeholder="seu@email.com"
+              />
+            </div>
+
+            {!isRegistering && (
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-medium text-slate-400">Senha</label>
+                  <button
+                    type="button"
+                    onClick={handleResetPassword}
+                    className="text-xs text-primary-500 hover:text-primary-400 transition-colors"
+                  >
+                    Esqueceu a senha?
+                  </button>
+                </div>
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-500 transition-colors"
+                  placeholder="••••••••"
+                />
+              </div>
+            )}
+
+            {isRegistering && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-400">Senha</label>
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-500 transition-colors"
+                  placeholder="••••••••"
+                />
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-4 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {loading ? (
+                <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : isRegistering ? (
+                <>
+                  <UserPlus size={20} />
+                  Criar Conta
+                </>
+              ) : (
+                <>
+                  <LogIn size={20} />
+                  Entrar
+                </>
+              )}
+            </button>
+          </form>
+        )}
 
         <div className="mt-8 pt-6 border-t border-slate-800 text-center">
           <button

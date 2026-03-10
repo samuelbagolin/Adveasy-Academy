@@ -26,7 +26,8 @@ import {
   FileText,
   Upload,
   Download,
-  GripVertical
+  GripVertical,
+  Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
@@ -36,7 +37,7 @@ import { twMerge } from 'tailwind-merge';
 import { courseData } from './courseData';
 import { Question, Course } from './types';
 import { auth, db, storage } from './firebase';
-import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { onAuthStateChanged, signOut, User, updatePassword } from 'firebase/auth';
 import { ref, onValue, set, update } from 'firebase/database';
 import { ref as sRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import Login from './components/Login';
@@ -65,6 +66,10 @@ export default function App() {
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showCertificate, setShowCertificate] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
   const [userName, setUserName] = useState('');
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
   const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({});
@@ -204,6 +209,37 @@ export default function App() {
     
     setCompletedLessons(newCompleted);
     saveProgress(newCompleted);
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    if (newPassword !== confirmPassword) {
+      alert("As senhas não coincidem!");
+      return;
+    }
+    if (newPassword.length < 6) {
+      alert("A senha deve ter pelo menos 6 caracteres!");
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      await updatePassword(user, newPassword);
+      alert("Senha alterada com sucesso!");
+      setShowChangePassword(false);
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error: any) {
+      console.error("Erro ao alterar senha:", error);
+      if (error.code === 'auth/requires-recent-login') {
+        alert("Para sua segurança, esta operação requer um login recente. Por favor, saia e entre novamente antes de tentar alterar a senha.");
+      } else {
+        alert("Erro ao alterar senha: " + error.message);
+      }
+    } finally {
+      setPasswordLoading(false);
+    }
   };
 
   const handleQuizSubmit = (lessonId: string, quiz: Question[]) => {
@@ -378,6 +414,14 @@ export default function App() {
               <span className="text-xl font-bold tracking-tight">Adveasy Academy</span>
             </div>
             <div className="flex items-center gap-4">
+              <button 
+                onClick={() => setShowChangePassword(true)}
+                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 transition-colors flex items-center gap-2"
+                title="Alterar Senha"
+              >
+                <Lock size={20} />
+                <span className="hidden sm:inline">Senha</span>
+              </button>
               {isAdmin && (
                 <button 
                   onClick={() => setShowAdmin(true)}
@@ -614,6 +658,13 @@ export default function App() {
                 <span className="text-[10px] text-slate-500 uppercase">{isAdmin ? 'Admin' : 'Aluno'}</span>
               </div>
             </div>
+            <button 
+              onClick={() => setShowChangePassword(true)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg text-xs font-medium transition-all mb-1"
+            >
+              <Lock size={14} />
+              Alterar Senha
+            </button>
             <button 
               onClick={handleLogout}
               className="w-full flex items-center gap-2 px-3 py-2 text-red-400 hover:bg-red-900/20 rounded-lg text-xs font-medium transition-all"
@@ -1122,6 +1173,82 @@ export default function App() {
             courseTitle={selectedCourse.title}
             onClose={() => setShowCertificate(false)}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Change Password Modal */}
+      <AnimatePresence>
+        {showChangePassword && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowChangePassword(false)}
+              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-8">
+                <div className="flex justify-between items-center mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary-900/50 text-primary-400 rounded-xl">
+                      <Lock size={24} />
+                    </div>
+                    <h2 className="text-xl font-bold text-white">Alterar Senha</h2>
+                  </div>
+                  <button 
+                    onClick={() => setShowChangePassword(false)}
+                    className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleChangePassword} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1.5">Nova Senha</label>
+                    <input 
+                      type="password"
+                      required
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Mínimo 6 caracteres"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-500 transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1.5">Confirmar Nova Senha</label>
+                    <input 
+                      type="password"
+                      required
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Repita a nova senha"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-500 transition-all"
+                    />
+                  </div>
+                  <div className="pt-2">
+                    <button 
+                      type="submit"
+                      disabled={passwordLoading}
+                      className="w-full bg-primary-600 hover:bg-primary-700 disabled:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-primary-900/20 flex items-center justify-center gap-2"
+                    >
+                      {passwordLoading ? (
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <>Salvar Nova Senha</>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
