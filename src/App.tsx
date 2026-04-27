@@ -96,7 +96,7 @@ export default function App() {
     window.scrollTo(0, 0);
   }, [selectedCourseId]);
 
-  const isAdmin = user?.email === 'contato@adveasy.com.br';
+  const isAdmin = user?.email === 'contato@adveasy.com.br' || user?.email === 'samuel.bagolin@setuptecnologia.com.br';
 
   const selectedCourse = useMemo(() => 
     courses.find(c => c.id === selectedCourseId) || courses[0],
@@ -111,6 +111,9 @@ export default function App() {
         // Handle both object and array from Firebase
         const coursesList = Array.isArray(data) ? data : Object.values(data);
         setCourses(coursesList as Course[]);
+      } else {
+        // Handle case where no courses exist (data is null)
+        setCourses([]);
       }
     });
 
@@ -118,7 +121,7 @@ export default function App() {
       setAuthLoading(false);
       
       if (u) {
-        const isAdmin = u.email === 'contato@adveasy.com.br';
+        const isAdmin = u.email === 'contato@adveasy.com.br' || u.email === 'samuel.bagolin@setuptecnologia.com.br';
         const userRef = ref(db, `users/${u.uid}`);
         
         onValue(userRef, (snapshot) => {
@@ -395,9 +398,14 @@ export default function App() {
         <AdminDashboard 
           onBack={() => setShowAdmin(false)} 
           courses={courses} 
-          onUpdateCourses={(newCourses) => {
-            setCourses(newCourses);
-            set(ref(db, 'courses'), newCourses);
+          onUpdateCourses={async (newCourses) => {
+            try {
+              setCourses(newCourses);
+              await set(ref(db, 'courses'), newCourses);
+            } catch (err: any) {
+              console.error("Erro ao atualizar cursos:", err);
+              alert("Erro ao salvar alterações no banco de dados: " + err.message);
+            }
           }}
           onChangePassword={() => setShowChangePassword(true)}
         />

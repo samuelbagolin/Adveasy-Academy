@@ -26,7 +26,10 @@ import {
   FileText,
   Upload,
   LogOut,
-  RefreshCw
+  RefreshCw,
+  CheckCircle2,
+  Clock,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -53,6 +56,7 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses, onCha
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddUser, setShowAddUser] = useState(false);
   const [showEditUser, setShowEditUser] = useState<UserStats | null>(null);
+  const [showUserDetails, setShowUserDetails] = useState<UserStats | null>(null);
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -204,17 +208,11 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses, onCha
       modules: []
     };
 
-    const updatedCourses = [...courses, newCourse];
-
-    try {
-      await set(ref(db, 'courses'), updatedCourses);
-      setNewCourseTitle('');
-      setNewCourseDesc('');
-      setNewCourseThumb('');
-      setShowAddCourse(false);
-    } catch (err: any) {
-      alert('Erro ao adicionar curso: ' + err.message);
-    }
+    onUpdateCourses([...courses, newCourse]);
+    setNewCourseTitle('');
+    setNewCourseDesc('');
+    setNewCourseThumb('');
+    setShowAddCourse(false);
   };
 
   const handleEditCourseInfo = async (e: React.FormEvent) => {
@@ -233,27 +231,25 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses, onCha
       return c;
     });
 
-    try {
-      await set(ref(db, 'courses'), updatedCourses);
-      setShowEditCourseInfo(null);
-      setNewCourseTitle('');
-      setNewCourseDesc('');
-      setNewCourseThumb('');
-    } catch (err: any) {
-      alert('Erro ao editar curso: ' + err.message);
-    }
+    onUpdateCourses(updatedCourses);
+    setShowEditCourseInfo(null);
+    setNewCourseTitle('');
+    setNewCourseDesc('');
+    setNewCourseThumb('');
   };
 
   const handleDeleteCourse = async (courseId: string) => {
-    if (!confirm('Tem certeza que deseja excluir este curso e todo o seu conteúdo?')) return;
+    console.log('Tentando excluir curso:', courseId);
+    if (!window.confirm('Tem certeza que deseja excluir este curso e todo o seu conteúdo?')) return;
 
-    const updatedCourses = courses.filter(c => c.id !== courseId);
-    try {
-      await set(ref(db, 'courses'), updatedCourses);
-      if (selectedCourseId === courseId) setSelectedCourseId(null);
-    } catch (err: any) {
-      alert('Erro ao excluir curso: ' + err.message);
-    }
+    const updatedCourses = courses.filter(c => {
+      console.log('Comparando curso:', c.id, 'com', courseId);
+      return String(c.id) !== String(courseId);
+    });
+    
+    console.log('Cursos após exclusão:', updatedCourses.length);
+    onUpdateCourses(updatedCourses);
+    if (selectedCourseId === courseId) setSelectedCourseId(null);
   };
 
   const handleAddModule = async (e: React.FormEvent) => {
@@ -266,20 +262,19 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses, onCha
       lessons: []
     };
 
-    const updatedCourses = [...courses];
-    const courseIdx = updatedCourses.findIndex(c => c.id === selectedCourseId);
-    if (courseIdx !== -1) {
-      if (!updatedCourses[courseIdx].modules) updatedCourses[courseIdx].modules = [];
-      updatedCourses[courseIdx].modules.push(newModule);
-
-      try {
-        await set(ref(db, 'courses'), updatedCourses);
-        setNewModuleTitle('');
-        setShowAddModule(false);
-      } catch (err: any) {
-        alert('Erro ao adicionar módulo: ' + err.message);
+    const updatedCourses = courses.map(c => {
+      if (c.id === selectedCourseId) {
+        return {
+          ...c,
+          modules: [...(c.modules || []), newModule]
+        };
       }
-    }
+      return c;
+    });
+
+    onUpdateCourses(updatedCourses);
+    setNewModuleTitle('');
+    setShowAddModule(false);
   };
 
   const handleAddLesson = async (moduleId: string) => {
@@ -299,26 +294,30 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses, onCha
       newLesson.videoUrl = newLessonVideoUrl;
     }
 
-    const updatedCourses = [...courses];
-    const courseIdx = updatedCourses.findIndex(c => c.id === selectedCourseId);
-    if (courseIdx !== -1) {
-      if (!updatedCourses[courseIdx].modules) updatedCourses[courseIdx].modules = [];
-      const module = updatedCourses[courseIdx].modules.find((m: any) => m.id === moduleId);
-      if (module) {
-        if (!module.lessons) module.lessons = [];
-        module.lessons.push(newLesson);
-        try {
-          await set(ref(db, 'courses'), updatedCourses);
-          setNewLessonTitle('');
-          setNewLessonContent('');
-          setNewLessonPdfUrl('');
-          setNewLessonVideoUrl('');
-          setShowAddLesson(null);
-        } catch (err: any) {
-          alert('Erro ao adicionar lição: ' + err.message);
-        }
+    const updatedCourses = courses.map(c => {
+      if (c.id === selectedCourseId) {
+        return {
+          ...c,
+          modules: (c.modules || []).map((m: any) => {
+            if (m.id === moduleId) {
+              return {
+                ...m,
+                lessons: [...(m.lessons || []), newLesson]
+              };
+            }
+            return m;
+          })
+        };
       }
-    }
+      return c;
+    });
+
+    onUpdateCourses(updatedCourses);
+    setNewLessonTitle('');
+    setNewLessonContent('');
+    setNewLessonPdfUrl('');
+    setNewLessonVideoUrl('');
+    setShowAddLesson(null);
   };
 
   const handleLessonFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -398,80 +397,105 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses, onCha
   };
 
   const handleDeleteModule = async (moduleId: string) => {
-    if (!confirm('Tem certeza que deseja excluir este módulo e todas as suas lições?')) return;
+    console.log('Tentando excluir módulo:', moduleId, 'do curso:', selectedCourseId);
+    if (!window.confirm('Tem certeza que deseja excluir este módulo e todas as suas lições?')) return;
 
-    const updatedCourses = [...courses];
-    const courseIdx = updatedCourses.findIndex(c => c.id === selectedCourseId);
-    if (courseIdx !== -1) {
-      if (!updatedCourses[courseIdx].modules) updatedCourses[courseIdx].modules = [];
-      updatedCourses[courseIdx].modules = updatedCourses[courseIdx].modules.filter((m: any) => m.id !== moduleId);
-      try {
-        await set(ref(db, 'courses'), updatedCourses);
-      } catch (err: any) {
-        alert('Erro ao excluir módulo: ' + err.message);
+    const updatedCourses = courses.map(c => {
+      if (String(c.id) === String(selectedCourseId)) {
+        console.log('Encontrou curso para excluir módulo:', c.title);
+        return {
+          ...c,
+          modules: (c.modules || []).filter((m: any) => {
+            console.log('Comparando módulo:', m.id, 'com', moduleId);
+            return String(m.id) !== String(moduleId);
+          })
+        };
       }
-    }
+      return c;
+    });
+
+    onUpdateCourses(updatedCourses);
   };
 
   const handleUpdateModule = async (moduleId: string) => {
     if (!editModuleTitle.trim()) return;
     
-    const updatedCourses = [...courses];
-    const courseIdx = updatedCourses.findIndex(c => c.id === selectedCourseId);
-    if (courseIdx !== -1) {
-      const moduleIdx = updatedCourses[courseIdx].modules.findIndex((m: any) => m.id === moduleId);
-      if (moduleIdx !== -1) {
-        updatedCourses[courseIdx].modules[moduleIdx].title = editModuleTitle;
-        try {
-          await set(ref(db, 'courses'), updatedCourses);
-          setShowEditModule(null);
-        } catch (err: any) {
-          alert('Erro ao atualizar módulo: ' + err.message);
-        }
+    const updatedCourses = courses.map(c => {
+      if (c.id === selectedCourseId) {
+        return {
+          ...c,
+          modules: (c.modules || []).map((m: any) => {
+            if (m.id === moduleId) {
+              return { ...m, title: editModuleTitle };
+            }
+            return m;
+          })
+        };
       }
-    }
+      return c;
+    });
+
+    onUpdateCourses(updatedCourses);
+    setShowEditModule(null);
   };
 
   const handleUpdateLesson = async (moduleId: string, lessonId: string) => {
     if (!editLessonTitle.trim()) return;
 
-    const updatedCourses = [...courses];
-    const courseIdx = updatedCourses.findIndex(c => c.id === selectedCourseId);
-    if (courseIdx !== -1) {
-      const moduleIdx = updatedCourses[courseIdx].modules.findIndex((m: any) => m.id === moduleId);
-      if (moduleIdx !== -1) {
-        const lessonIdx = updatedCourses[courseIdx].modules[moduleIdx].lessons.findIndex((l: any) => l.id === lessonId);
-        if (lessonIdx !== -1) {
-          updatedCourses[courseIdx].modules[moduleIdx].lessons[lessonIdx].title = editLessonTitle;
-          try {
-            await set(ref(db, 'courses'), updatedCourses);
-            setShowEditLesson(null);
-          } catch (err: any) {
-            alert('Erro ao atualizar lição: ' + err.message);
-          }
-        }
+    const updatedCourses = courses.map(c => {
+      if (c.id === selectedCourseId) {
+        return {
+          ...c,
+          modules: (c.modules || []).map((m: any) => {
+            if (m.id === moduleId) {
+              return {
+                ...m,
+                lessons: (m.lessons || []).map((l: any) => {
+                  if (l.id === lessonId) {
+                    return { ...l, title: editLessonTitle };
+                  }
+                  return l;
+                })
+              };
+            }
+            return m;
+          })
+        };
       }
-    }
+      return c;
+    });
+
+    onUpdateCourses(updatedCourses);
+    setShowEditLesson(null);
   };
 
   const handleDeleteLesson = async (moduleId: string, lessonId: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta lição?')) return;
+    console.log('Tentando excluir lição:', lessonId, 'do módulo:', moduleId);
+    if (!window.confirm('Tem certeza que deseja excluir esta lição?')) return;
 
-    const updatedCourses = [...courses];
-    const courseIdx = updatedCourses.findIndex(c => c.id === selectedCourseId);
-    if (courseIdx !== -1) {
-      if (!updatedCourses[courseIdx].modules) updatedCourses[courseIdx].modules = [];
-      const module = updatedCourses[courseIdx].modules.find((m: any) => m.id === moduleId);
-      if (module) {
-        if (!module.lessons) module.lessons = [];
-        module.lessons = module.lessons.filter((l: any) => l.id !== lessonId);
-        try {
-          await set(ref(db, 'courses'), updatedCourses);
-        } catch (err: any) {
-          alert('Erro ao excluir lição: ' + err.message);
-        }
+    const updatedCourses = courses.map(c => {
+      if (String(c.id) === String(selectedCourseId)) {
+        return {
+          ...c,
+          modules: (c.modules || []).map((m: any) => {
+            if (String(m.id) === String(moduleId)) {
+              console.log('Encontrou módulo para excluir lição:', m.title);
+              return {
+                ...m,
+                lessons: (m.lessons || []).filter((l: any) => {
+                  console.log('Comparando lição:', l.id, 'com', lessonId);
+                  return String(l.id) !== String(lessonId);
+                })
+              };
+            }
+            return m;
+          })
+        };
       }
-    }
+      return c;
+    });
+
+    onUpdateCourses(updatedCourses);
   };
 
   const handleLogout = async () => {
@@ -488,7 +512,7 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses, onCha
     
     setActionLoading(true);
     try {
-      await set(ref(db, 'courses'), courseData);
+      onUpdateCourses(courseData);
       alert('Cursos sincronizados com sucesso!');
     } catch (err: any) {
       alert('Erro ao sincronizar cursos: ' + err.message);
@@ -665,14 +689,14 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses, onCha
                       filteredUsers.map((user) => {
                         const progress = Math.round((user.completedLessons.length / totalLessons) * 100);
                         return (
-                          <tr key={user.uid} className="hover:bg-slate-800/30 transition-colors">
+                          <tr key={user.uid} className="hover:bg-slate-800/30 transition-colors cursor-pointer group" onClick={() => setShowUserDetails(user)}>
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-primary-500 font-bold">
+                                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-primary-500 font-bold group-hover:bg-primary-500 group-hover:text-white transition-colors">
                                   {user.email?.[0]?.toUpperCase() || '?'}
                                 </div>
                                 <div className="flex flex-col">
-                                  <span className="font-medium">{user.name || (user.email && user.email.includes('@') ? user.email.split('@')[0] : user.email)}</span>
+                                  <span className="font-medium group-hover:text-primary-400 transition-colors">{user.name || (user.email && user.email.includes('@') ? user.email.split('@')[0] : user.email)}</span>
                                   <span className="text-xs text-slate-500">{user.email}</span>
                                 </div>
                               </div>
@@ -717,7 +741,19 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses, onCha
                                         className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-20 overflow-hidden"
                                       >
                                         <button
-                                          onClick={() => {
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowUserDetails(user);
+                                            setActiveMenu(null);
+                                          }}
+                                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-200 hover:bg-slate-700 transition-colors"
+                                        >
+                                          <TrendingUp size={16} className="text-emerald-400" />
+                                          Ver Progresso
+                                        </button>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
                                             setShowEditUser(user);
                                             setEditEmail(user.email);
                                             setEditName(user.name || '');
@@ -729,7 +765,8 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses, onCha
                                           Editar Aluno
                                         </button>
                                         <button
-                                          onClick={() => {
+                                          onClick={(e) => {
+                                            e.stopPropagation();
                                             handleDeleteUser(user.uid);
                                             setActiveMenu(null);
                                           }}
@@ -1435,6 +1472,144 @@ export default function AdminDashboard({ onBack, courses, onUpdateCourses, onCha
                     Criar Lição
                   </button>
                 </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* User Progress Details Modal */}
+      <AnimatePresence>
+        {showUserDetails && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
+            >
+              <div className="p-6 border-b border-slate-800 flex items-center justify-between bg-slate-800/20">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-primary-500/10 flex items-center justify-center text-primary-500 font-bold text-lg">
+                    {showUserDetails.email?.[0]?.toUpperCase()}
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold">{showUserDetails.name || showUserDetails.email.split('@')[0]}</h3>
+                    <p className="text-slate-400 text-sm">{showUserDetails.email}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowUserDetails(null)}
+                  className="p-2 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition-all"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                  <div className="bg-slate-800/40 rounded-2xl p-5 border border-slate-700/50">
+                    <div className="text-slate-400 text-xs uppercase font-bold tracking-widest mb-1">Último Acesso</div>
+                    <div className="text-lg font-bold flex items-center gap-2">
+                      <Clock size={18} className="text-primary-400" />
+                      {showUserDetails.lastLogin ? new Date(showUserDetails.lastLogin).toLocaleString() : 'Nenhum registro'}
+                    </div>
+                  </div>
+                  <div className="bg-slate-800/40 rounded-2xl p-5 border border-slate-700/50">
+                    <div className="text-slate-400 text-xs uppercase font-bold tracking-widest mb-1">Total de Conclusões</div>
+                    <div className="text-lg font-bold flex items-center gap-2">
+                      <CheckCircle2 size={18} className="text-emerald-400" />
+                      {showUserDetails.completedLessons.length} / {totalLessons} lições
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-8">
+                  <h4 className="text-lg font-bold flex items-center gap-2 border-l-4 border-primary-500 pl-4 py-1 bg-primary-500/5 rounded-r-lg">
+                    Progresso por Curso
+                  </h4>
+                  
+                  {courses.map((course) => {
+                    const courseLessonIds = (course.modules || []).flatMap((m: any) => (m.lessons || []).map((l: any) => l.id));
+                    const completedInCourse = showUserDetails.completedLessons.filter(id => courseLessonIds.includes(id)).length;
+                    const courseTotal = courseLessonIds.length;
+                    const courseProgress = courseTotal > 0 ? Math.round((completedInCourse / courseTotal) * 100) : 0;
+                    
+                    return (
+                      <div key={course.id} className="bg-slate-800/20 border border-slate-800 rounded-2xl overflow-hidden">
+                        <div className="p-5 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-800/40">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-xl bg-slate-700 flex items-center justify-center shrink-0">
+                              {course.thumbnail ? (
+                                <img src={course.thumbnail} alt="" className="w-full h-full object-cover rounded-xl" />
+                              ) : (
+                                <BookOpen size={20} className="text-slate-500" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <h5 className="font-bold text-slate-100 truncate">{course.title}</h5>
+                              <div className="flex items-center gap-3 text-xs">
+                                <span className="text-slate-400">{completedInCourse} de {courseTotal} aulas</span>
+                                <span className={cn("px-2 py-0.5 rounded-full font-bold", 
+                                  courseProgress === 100 ? "bg-emerald-500/10 text-emerald-500" : "bg-primary-500/10 text-primary-500"
+                                )}>
+                                  {courseProgress}%
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                          {(course.modules || []).flatMap((module: any) => (module.lessons || []).map((lesson: any) => {
+                            const isCompleted = showUserDetails.completedLessons.includes(lesson.id);
+                            return (
+                              <div key={lesson.id} className="flex items-center justify-between group py-1">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  {isCompleted ? (
+                                    <div className="p-1 bg-emerald-500/20 rounded text-emerald-500 shrink-0">
+                                      <CheckCircle2 size={14} />
+                                    </div>
+                                  ) : (
+                                    <div className="p-1 bg-slate-800 rounded text-slate-600 shrink-0 border border-slate-700">
+                                      <Clock size={14} />
+                                    </div>
+                                  )}
+                                  <span className={cn(
+                                    "text-sm truncate",
+                                    isCompleted ? "text-slate-100" : "text-slate-400 italic"
+                                  )}>
+                                    {lesson.title}
+                                  </span>
+                                </div>
+                                <span className={cn(
+                                  "text-[10px] font-bold uppercase tracking-tighter px-2 py-0.5 rounded",
+                                  isCompleted ? "bg-emerald-500/10 text-emerald-500" : "bg-slate-800 text-slate-500"
+                                )}>
+                                  {isCompleted ? "Realizado" : "Pendente"}
+                                </span>
+                              </div>
+                            );
+                          }))}
+                          {courseTotal === 0 && (
+                            <div className="col-span-full py-4 text-center text-slate-500 text-sm">
+                              Nenhuma lição neste curso.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              
+              <div className="p-6 border-t border-slate-800 bg-slate-800/20 flex justify-end">
+                <button 
+                  onClick={() => setShowUserDetails(null)}
+                  className="px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-primary-900/20 active:scale-95"
+                >
+                  Fechar Detalhes
+                </button>
               </div>
             </motion.div>
           </div>
